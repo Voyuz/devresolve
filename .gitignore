@@ -25,3 +25,15 @@ pnpm-debug.log*
 thumbs.db
 .vscode/
 node_modules
+
+# additional tooling
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+/coverage
+*.pem
+.pnpm-debug.log*
