@@ -1,39 +1,68 @@
-﻿# DevResolve AI
+﻿# IBM Hackathon GitHub Project Template
 
-Repository foundation for the IBM Bob 2.0 Hackathon. Business features and Supabase, IBM Bob, and GitHub integrations are not implemented yet.
+This GitHub project template is for IBM Hackathon projects. It includes pre-configured security files to help prevent accidental credential commits and potential account suspension during the hackathon.
 
-## Local development
+## 🚀 Quick Start
 
-Requires Node.js 22.19 or newer and npm.
+1. **Use this template to create your project:**
+   - Click "Use this template" button above and select "Create a new repository"
+   - Name your repository
+   - Click "Create repository"
 
-```sh
-npm install
-npm run dev
-```
+2. **Clone your new repository:**
 
-Open http://localhost:3000. On Windows PowerShell, use `npm.cmd` if script execution policy blocks `npm`.
+   ```bash
+   git clone https://github.com/HACKATHON-ORG/your-repo-name.git
+   cd your-repo-name
+   ```
 
-```sh
-npm run build
-npm run typecheck
-npm run start
-```
+3. **Set up environment variables:**
 
-The application builds without Supabase credentials. When integration work begins, copy `.env.example` to `.env.local` and supply your own values. Never expose `SUPABASE_SERVICE_ROLE_KEY` to browser code or commit environment files.
+   ```bash
+   # Copy the example file
+   cp .env.example .env
 
-## Structure
+   # Edit .env with your actual credentials
+   # Use your preferred editor (nano, vim, code, etc.)
+   nano .env
+   ```
 
-- `app`: App Router pages and reserved API routes (currently return HTTP 501).
-- `components/ui`: shadcn components.
-- `components/layout`: shared placeholder layout.
-- `lib/supabase`, `lib/bob`, `lib/github`: reserved integration folders.
-- `types`: reserved project types.
-- `docs`: project documentation.
-- `AGENTS.md`: IBM Bob and coding-agent project guidance.
-- `bob_sessions`: required hackathon evidence; use `memberXX_taskXX_description_summary.png`.
+4. **Verify .gitignore is working:**
 
-The routes `/`, `/dashboard`, `/issues`, `/issues/new`, `/issues/[id]`, and `/projects` are minimal placeholders. The home page includes light, dark, and system theme controls.
+   ```bash
+   # This should NOT show .env file
+   git status
 
-## Repository hygiene
+   # This should confirm .env is ignored
+   git check-ignore -v .env
+   ```
 
-`node_modules`, `.next`, and local environment files must remain untracked. Previously tracked dependencies and `.env.local` were removed from the index only; local files and Git history were preserved. If real credentials were committed previously, rotate them in the relevant service.
+5. **Start developing!**
+
+## 🔒 Security Features
+
+This template includes:
+
+- **`.gitignore`** - Prevents committing credentials and live session files
+- **`.bobignore`** - Prevents AI assistants from logging credentials
+- **`.env.example`** - Template for your environment variables
+
+## 📋 Before Every Commit
+
+Always run this checklist:
+
+- [ ] Reviewed `git diff` for sensitive data
+- [ ] No hardcoded API keys or passwords
+- [ ] `.env` file is NOT in staged changes
+- [ ] No files with "credential" or "secret" in name
+- [ ] Used environment variables for all credentials
+
+## 🆘 Need Help?
+
+- Read [SECURITY.md](SECURITY.MD) for detailed guidelines
+- Contact hackathon support through mentor channel
+- Ask in the hackathon Slack workspace
+
+---
+
+**Remember:** Security is everyone's responsibility. When in doubt, ask for help!
