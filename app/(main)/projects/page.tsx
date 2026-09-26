@@ -37,11 +37,13 @@ const PROJECTS_DATA = [
 export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
+  const q = searchQuery.trim().toLowerCase();
+
   const filtered = PROJECTS_DATA.filter(
     (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.techStack.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
+      p.name.toLowerCase().includes(q) ||
+      p.id.toLowerCase().includes(q) ||
+      p.techStack.some((t) => t.toLowerCase().includes(q))
   );
 
   return (
@@ -86,6 +88,9 @@ export default function ProjectsPage() {
           className="w-full bg-white border-zinc-200 pl-10 h-10 rounded-xl text-body-main focus:ring-dev-cyan shadow-sm text-dev-slate placeholder:text-zinc-300"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") setSearchQuery((v) => v.trim());
+          }}
         />
       </div>
 
