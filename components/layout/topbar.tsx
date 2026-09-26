@@ -1,6 +1,7 @@
 "use client";
-import { Bell, UserCircle, ArrowRightLeft, LayoutGrid } from "lucide-react";
+import { Bell, UserCircle, ArrowRightLeft, LayoutGrid, LogOut } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "@/app/auth/actions";
 
 export function TopBar() {
   const pathname = usePathname();
@@ -36,6 +37,15 @@ export function TopBar() {
             <div className="w-9 h-9 rounded-full bg-zinc-100 border-2 border-dev-sand flex items-center justify-center">
               <UserCircle className="w-6 h-6 text-zinc-400" />
             </div>
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="w-9 h-9 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors text-zinc-400 ml-1"
+                title="Log Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </form>
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@ export async function signIn(formData: FormData) {
   const sandiUser = formData.get("sandiUser") as string;
 
   if (!namaUser || !sandiUser) {
-    redirect("/auth/login?error=Username+dan+password+wajib+diisi");
+    redirect("/auth/login?error=Username+and+password+are+required");
   }
 
   // Gunakan admin client (service role) agar bisa bypass RLS
@@ -26,15 +26,15 @@ export async function signIn(formData: FormData) {
 
   if (error) {
     console.error("[signIn] Supabase error:", JSON.stringify(error));
-    redirect("/auth/login?error=Username+tidak+ditemukan");
+    redirect("/auth/login?error=Username+not+found");
   }
 
   if (!data) {
-    redirect("/auth/login?error=Username+tidak+ditemukan");
+    redirect("/auth/login?error=Username+not+found");
   }
 
   if (data.SandiUser !== sandiUser) {
-    redirect("/auth/login?error=Password+salah");
+    redirect("/auth/login?error=Incorrect+password");
   }
 
   // Simpan session ke cookie

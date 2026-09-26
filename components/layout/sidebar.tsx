@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Home, FolderOpen, ClipboardList, Terminal, Bug, Cpu, Zap } from "lucide-react";
+import { Home, FolderOpen, ClipboardList, Terminal, Bug, Cpu, Zap, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
         { name: "Dev Overview", icon: Terminal, href: "/developer" },
         { name: "Issues", icon: Bug, href: "/developer/triage" },
         { name: "Bob Resolution", icon: Cpu, href: "/developer/bob-tasks" },
+        { name: "Register User", icon: UserPlus, href: "/developer/users/new" },
       ]
     : [
         { name: "Dashboard", icon: Home, href: "/dashboard" },
