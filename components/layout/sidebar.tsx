@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Home, FolderOpen, ClipboardList, Terminal, Bug, Cpu, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+import { Home, FolderOpen, ClipboardList, Terminal, Bug, Cpu, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -27,14 +27,14 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       ];
 
   return (
-    <aside className={cn(
+    <aside
+      className={cn(
         "h-screen bg-white border-r border-zinc-100 flex flex-col fixed left-0 top-0 z-30 transition-all duration-300",
         isCollapsed ? "w-20" : "w-64"
-      )}>
-      <button onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-10 w-6 h-6 bg-white border border-zinc-200 rounded-full flex items-center justify-center hover:bg-zinc-50 z-50 shadow-sm">
-        {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
+      )}
+      onMouseEnter={() => setIsCollapsed(false)}
+      onMouseLeave={() => setIsCollapsed(true)}
+    >
 
       <div className={cn("flex items-center gap-2 p-6 mb-4", isCollapsed && "justify-center")}>
         <div className="w-8 h-8 bg-dev-cyan rounded-lg flex-shrink-0 flex items-center justify-center shadow-lg shadow-dev-cyan/20">
