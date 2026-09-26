@@ -14,10 +14,10 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname();
   const isDevMode = pathname.startsWith("/developer");
 
-  const menuItems = isDevMode 
+  const menuItems = isDevMode
     ? [
         { name: "Dev Overview", icon: Terminal, href: "/developer" },
-        { name: "Issue Triage", icon: Bug, href: "/developer/triage" },
+        { name: "Issues", icon: Bug, href: "/developer/triage" },
         { name: "Bob Resolution", icon: Cpu, href: "/developer/bob-tasks" },
       ]
     : [
