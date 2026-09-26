@@ -1,26 +1,18 @@
-"use client";
-import React, { useState } from "react";
-import { Sidebar } from "@/components/layout/sidebar";
-import { TopBar } from "@/components/layout/topbar";
+import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-export default function MainDashboardLayout({ children }: { children: React.ReactNode }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
+export default function HomePage() {
   return (
-    <div className="flex min-h-screen bg-[#fcfcfd]">
-      {/* Sidebar - Always Present */}
-      <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-      
-      {/* Content Area - Adjusts margin when sidebar collapses */}
-      <div 
-        className="flex-1 flex flex-col transition-all duration-300 ease-in-out"
-        style={{ paddingLeft: isCollapsed ? "80px" : "256px" }}
-      >
-        <TopBar />
-        <main className="p-8">
-          {children}
-        </main>
-      </div>
-    </div>
+    <main className="mx-auto max-w-3xl space-y-6 p-8">
+      <h1 className="text-3xl font-semibold">DevResolve AI</h1>
+      <p className="text-muted-foreground">Project foundation for the IBM Bob 2.0 Hackathon.</p>
+      <nav aria-label="Project routes" className="flex flex-wrap gap-4">
+        <Link href="/dashboard" className="underline">Dashboard</Link>
+        <Link href="/issues" className="underline">Issues</Link>
+        <Link href="/issues/new" className="underline">New issue</Link>
+        <Link href="/projects" className="underline">Projects</Link>
+      </nav>
+      <ThemeToggle />
+    </main>
   );
 }
