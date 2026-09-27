@@ -19,6 +19,7 @@ import {
   User,
 } from "lucide-react";
 import { issueStatus, type WorkspaceJob } from "@/components/layout/use-workspace";
+import { useSession } from "@/components/layout/use-session";
 import { formatDateTime } from "@/lib/utils";
 import type { BobProject, BobReviewStatus } from "@/types/bob";
 
@@ -32,6 +33,14 @@ interface Detail { issue: Record<string, string | null>; rounds: Round[]; projec
 
 // ─── Workflow steps (PDF: Report → Triage → Bob → Review → Resolve) ──────────
 const STEPS = ["Reported", "Triaged", "Bob investigating", "Ready for review", "Resolved"] as const;
+
+const NEXT_FOR_REPORTER = [
+  "Your report was received. A developer will triage it soon.",
+  "A developer classified this issue. The next step is assigning it to IBM Bob.",
+  "IBM Bob is investigating and fixing the bug in a copy of the repository.",
+  "IBM Bob fixed the bug and the tests passed. A developer is reviewing the change before it is published.",
+  "The fix was approved and published to GitHub. This issue is resolved.",
+];
 
 function currentStep(detail: Detail) {
   const latest = detail.rounds.at(-1);
@@ -87,6 +96,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<Detail | null>(null);
+  const isDeveloper = useSession()?.role === "developer";
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -121,7 +131,7 @@ export default function IssueDetailPage() {
   const latest = rounds.at(-1);
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       {back}
 
       {/* ── Header ── */}
@@ -246,9 +256,11 @@ export default function IssueDetailPage() {
                             <CheckCircle2 className="w-3 h-3" /> View published commit <ExternalLink className="w-3 h-3" />
                           </a>
                         )}
-                        <Link href={`/developer/bob-tasks?job=${encodeURIComponent(round.id)}`} className="text-[#449199] hover:underline">
-                          Open in developer review →
-                        </Link>
+                        {isDeveloper && (
+                          <Link href={`/developer/bob-tasks?job=${encodeURIComponent(round.id)}`} className="text-[#449199] hover:underline">
+                            Open in developer review →
+                          </Link>
+                        )}
                       </div>
                     </li>
                   );
@@ -265,7 +277,7 @@ export default function IssueDetailPage() {
               <dt className="text-slate-400">Category</dt><dd className="text-slate-700 font-medium">{issue.category_issues || "—"}</dd>
               <dt className="text-slate-400">Severity</dt><dd className="text-slate-700 font-medium capitalize">{issue.severity || "Untriaged"}</dd>
               <dt className="text-slate-400">Priority</dt><dd className="text-slate-700 font-medium">{issue.priority ? PRIORITY_LABEL[issue.priority] ?? issue.priority : "—"}</dd>
-              <dt className="text-slate-400">Status</dt><dd className="text-slate-700 font-medium">{(issue.status || "reported").replaceAll("_", " ")}</dd>
+              <dt className="text-slate-400">Stage</dt><dd className="text-slate-700 font-medium">{STEPS[step]}</dd>
             </dl>
           </Card>
           <Card title="Repository" icon={GitBranch}>
@@ -275,11 +287,17 @@ export default function IssueDetailPage() {
               <div><dt className="text-slate-400 text-xs">Base branch</dt><dd className="text-slate-600 font-mono text-xs">{project?.defaultBranch ?? "—"}</dd></div>
             </dl>
           </Card>
-          {latest && (
-            <Link href={`/developer/bob-tasks?job=${encodeURIComponent(latest.id)}`}
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#5ec0ca] hover:bg-[#4baab4] text-white text-sm font-bold py-3 transition-colors">
-              <Bot className="w-4 h-4" /> Open latest Bob result
-            </Link>
+          {isDeveloper ? (
+            latest && (
+              <Link href={`/developer/bob-tasks?job=${encodeURIComponent(latest.id)}`}
+                className="flex items-center justify-center gap-2 rounded-xl bg-[#5ec0ca] hover:bg-[#4baab4] text-white text-sm font-bold py-3 transition-colors">
+                <Bot className="w-4 h-4" /> Review latest Bob result
+              </Link>
+            )
+          ) : (
+            <Card title="What happens next" icon={Bot}>
+              <p className="text-sm text-slate-600 leading-relaxed">{NEXT_FOR_REPORTER[step]}</p>
+            </Card>
           )}
         </div>
       </div>
