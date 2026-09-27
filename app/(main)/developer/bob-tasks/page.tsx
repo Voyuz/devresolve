@@ -76,7 +76,7 @@ export default function BobResolutionPage() {
       {workspace.error && <p role="alert" className="text-red-600">{workspace.error}</p>}
       {workspace.loading && <p>Loading Bob jobs...</p>}
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#6287a2] flex items-center gap-2">
             <Cpu className="text-[#5ec0ca] w-6 h-6" />
@@ -86,6 +86,9 @@ export default function BobResolutionPage() {
             Review and evaluate automated resolutions proposed by the AI Agent.
           </p>
         </div>
+        <Link href="/developer/setup" className="shrink-0 rounded-xl border border-dev-cyan/30 bg-white px-4 py-2 text-sm font-semibold text-dev-cyan hover:bg-dev-cyan/10">
+          Install / Set up Bob
+        </Link>
         <div className="flex items-center gap-2">
           <Badge className="bg-[#5ec0ca]/10 text-[#449199] border border-[#5ec0ca]/30 font-semibold text-xs gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#5ec0ca] animate-pulse" />

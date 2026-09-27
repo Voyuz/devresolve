@@ -512,6 +512,14 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
           {result.reason && (
             <Section title={result.status === "NEEDS_HUMAN_INTERVENTION" ? "Why human intervention is needed" : "Reason"}>
               <p className="text-sm">{result.reason}</p>
+              {/Bob Shell executable not found|Cannot start Bob Shell|Node\.js 24|Upgrade Bob Shell|BOB_SHELL_EXECUTABLE|Configure BOB_API_KEY/i.test(result.reason) && (
+                <div className="mt-3 space-y-2">
+                  <Link href="/developer/setup" className="inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80">
+                    Install / Set up Bob
+                  </Link>
+                  <p className="text-xs text-muted-foreground">Complete setup, then return here to run Bob again.</p>
+                </div>
+              )}
               {explainReason(result.reason) && <p className="mt-2 text-xs text-muted-foreground">In plain words: {explainReason(result.reason)}</p>}
               {result.status === "NEEDS_HUMAN_INTERVENTION" && (
                 <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs">
