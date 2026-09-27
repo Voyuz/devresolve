@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { BobProject, BobReviewStatus } from "@/types/bob";
 export interface WorkspaceIssue {
   id: string; created_at: string; ProjekId: string; ReporterId: string | null; ReporterName?: string | null;
+  /** Developer assigned to work on the issue ("Assign to Dev"). */
+  AssigneeId?: string | null; AssigneeName?: string | null;
   title: string; description: string; CategoryIssues: string; Status: string;
   expected_behavior: string | null; screenshot_ref: string | null;
   severity?: string | null; priority?: string | null;
@@ -23,7 +25,8 @@ export function issueStatus(job?: WorkspaceJob, storedStatus?: string) {
   return "IN_PROGRESS";
 }
 export function useWorkspace() {
-  const [data, setData] = useState<{ projects: BobProject[]; issues: WorkspaceIssue[]; jobs: WorkspaceJob[] }>({ projects: [], issues: [], jobs: [] });
+  // assignmentsEnabled: false until docs/supabase-assignee.sql adds issues.assignee_id.
+  const [data, setData] = useState<{ projects: BobProject[]; issues: WorkspaceIssue[]; jobs: WorkspaceJob[]; assignmentsEnabled?: boolean }>({ projects: [], issues: [], jobs: [] });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);

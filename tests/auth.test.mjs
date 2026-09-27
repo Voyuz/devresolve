@@ -82,6 +82,7 @@ test('proxy redirects anonymous pages, blocks APIs, and restricts developer area
   assert.equal(call('/api/bob/jobs/abc', user).status, 403, 'Bob job details are developer-only');
   assert.equal(call('/api/projects', user, 'POST').status, 403, 'only developers add projects');
   assert.equal(call('/api/users', user).status, 403, 'the user list is developer-only');
+  assert.equal(call('/api/issues/8/resolve', user, 'POST').status, 403, 'only developers resolve issues');
   assert.equal(call('/api/projects', user).headers.get('x-middleware-next'), '1', 'reporters can list their projects');
 
   assert.equal(call('/developer/triage', developer).headers.get('x-middleware-next'), '1');

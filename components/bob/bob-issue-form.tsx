@@ -46,7 +46,6 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
   const [liveActivity, setLiveActivity] = useState<BobActivityEvent[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewToken, setReviewToken] = useState("");
   const [feedback, setFeedback] = useState("");
   // undefined = loading, null = the previous job has no saved feedback
   const [previousFeedback, setPreviousFeedback] = useState<string | null | undefined>(undefined);
@@ -63,7 +62,7 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
     setRequestError(null);
     try {
       const response = await fetch(`/api/bob/jobs/${encodeURIComponent(result.jobId)}/review`, {
-        method: "POST", headers: { "Content-Type": "application/json", "X-Review-Token": reviewToken.trim() },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(decision === "request_changes" ? { decision, feedback: feedback.trim() } : { decision }),
       });
       const data = await response.json();
@@ -495,15 +494,10 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
               {result.review.error && <p role="alert" className="mt-2 text-sm text-destructive">{result.review.error}</p>}
               {["PENDING", "PUBLISH_FAILED"].includes(result.review.status) && (
                 <div className="mt-4 space-y-3">
-                  <label className="block text-sm">Reviewer access code
-                    <input type="password" autoComplete="off" value={reviewToken} onChange={event => setReviewToken(event.target.value)}
-                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2" disabled={reviewLoading} />
-                  </label>
-                  <p className="text-xs text-muted-foreground">Copy only the value after DEVRESOLVE_REVIEW_TOKEN= in your local .env.local file. Do not enter the variable name or GitHub token.</p>
                   <div className="flex gap-3">
-                    <button type="button" disabled={reviewLoading || !reviewToken} onClick={() => void reviewFix("approve")}
+                    <button type="button" disabled={reviewLoading} onClick={() => void reviewFix("approve")}
                       className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{reviewLoading ? "Saving decision..." : "Approve & save to GitHub"}</button>
-                    <button type="button" disabled={reviewLoading || !reviewToken || result.review.status !== "PENDING"} onClick={() => void reviewFix("reject")}
+                    <button type="button" disabled={reviewLoading || result.review.status !== "PENDING"} onClick={() => void reviewFix("reject")}
                       className="rounded-md border px-4 py-2 text-sm disabled:opacity-50">Reject</button>
                   </div>
                   {result.review.status === "PUBLISH_FAILED" && <p className="text-xs text-muted-foreground">Retry approval to reconcile the GitHub branch before making another decision.</p>}
@@ -514,7 +508,7 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
                           placeholder="e.g. Also trim whitespace from the email and add a test for it."
                           className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm" disabled={reviewLoading} />
                       </label>
-                      <button type="button" disabled={reviewLoading || !reviewToken || !feedback.trim()} onClick={() => void reviewFix("request_changes")}
+                      <button type="button" disabled={reviewLoading || !feedback.trim()} onClick={() => void reviewFix("request_changes")}
                         className="rounded-md border border-amber-300 px-4 py-2 text-sm text-amber-800 disabled:opacity-50">Request changes</button>
                     </div>
                   )}

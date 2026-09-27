@@ -78,7 +78,6 @@ Create `.env.local` from [`.env.example`](.env.example). Never commit it.
 | `BOB_TEAM_ID` | Only for Bob keys of type *general* |
 | `BOB_SHELL_EXECUTABLE` | Optional absolute path; leave blank for automatic discovery |
 | `GITHUB_TOKEN` | Approve (publishing fix branches) |
-| `DEVRESOLVE_REVIEW_TOKEN` | Reviewer access code typed in the review panel |
 | `DEVRESOLVE_SESSION_SECRET` | Optional (32+ chars) login-session signing key; derived from the service key when blank |
 
 ### Database
@@ -88,6 +87,9 @@ schema, review and run in the Supabase SQL Editor:
 
 1. [`docs/supabase-bob.sql`](docs/supabase-bob.sql): `bob_jobs`, the default branch column, and the issue/job function.
 2. [`docs/supabase-review.sql`](docs/supabase-review.sql): review columns (`artifact`, `review_status`, …).
+3. [`docs/supabase-assignee.sql`](docs/supabase-assignee.sql): `issues.assignee_id` for "Assign to Dev".
+4. [`docs/supabase-resolution.sql`](docs/supabase-resolution.sql): resolution note, link, and resolver for
+   issues a developer fixes by hand.
 
 Then add a project row with `NameProjek`, `RepoUrl` (plain public GitHub HTTPS URL), and `DefaultBranch`.
 Details: [docs/supabase-bob.md](docs/supabase-bob.md), [docs/github-review.md](docs/github-review.md).
@@ -100,6 +102,19 @@ npm run dev
 
 Open http://localhost:3000. On Windows PowerShell, use `npm.cmd` if the script execution policy blocks `npm`.
 Restart the dev server after changing `.env.local`.
+
+### Test accounts
+
+Sign in at http://localhost:3000/auth/login with one of the team's test accounts (rows in `profiles`):
+
+| Role | Username | Password | What you can do |
+|------|----------|----------|-----------------|
+| Reporter (`user`) | `Jovan` | `jovan123` | Report issues, follow your own issues and projects, read the resolution |
+| Developer (`developer`) | `Developer` | `dev123` | Triage, assign to IBM Bob or a developer, review Bob fixes, resolve issues, add projects and users |
+
+The username is case-sensitive and must match `NamaUser` exactly. A developer can create more accounts on
+**Register User** (`/developer/users/new`). If a sign-in fails, check that the row exists in `profiles` with the
+right `role`. These are demo-only passwords: change or remove them before hosting the app publicly.
 
 ## Demo
 
@@ -117,6 +132,7 @@ npm run test:review     # artifact capture, GitHub publishing, review decisions 
 npm run test:triage     # keyword rules and Bob answer validation
 npm run test:workspace  # issue persistence against a mocked Supabase client
 npm run test:auth       # session signing, credential checks, proxy access rules
+npm run test:resolution # resolution note validation and the IBM Bob IDE task text
 ```
 
 The test suites never call IBM Bob, GitHub, or Supabase, and never spend Bobcoins.
@@ -142,8 +158,8 @@ More detail: [docs/architecture.md](docs/architecture.md).
   actions (running Bob, triage, reviews). New registrations get role `user`; grant `developer` in Supabase.
   By team decision, passwords are stored as entered (not hashed), matching the existing rows. Do not reuse real
   passwords, and move to hashed passwords or Supabase Auth before hosting publicly. Each project has one owner
-  (`projects.profil_id`): reporters see and report on their own projects only; developers see every project. Review publishing is also restricted to localhost and the
-  reviewer access code.
+  (`projects.profil_id`): reporters see and report on their own projects only; developers see every project. Review decisions (approve / request changes / reject) require a
+  developer session and must come from the app's own pages (same-origin JSON requests).
 - Approval publishes a branch; merging it is a normal GitHub pull request step.
 - Attachments store file metadata only.
 

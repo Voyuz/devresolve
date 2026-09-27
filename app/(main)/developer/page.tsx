@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -10,8 +11,11 @@ import {
   Home,
   BarChart3,
   ShieldCheck,
+  Wrench,
 } from "lucide-react";
 import { useWorkspace } from "@/components/layout/use-workspace";
+import { useSession } from "@/components/layout/use-session";
+import { stateOf } from "@/components/layout/workspace-metrics";
 import { projectMetrics } from "@/components/layout/workspace-metrics";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +40,9 @@ function ActivityDot({ type }: { type: string }) {
 
 export default function DevOverviewPage() {
   const workspace = useWorkspace();
+  // Issues assigned to the signed-in developer ("Assign to Dev") that are not resolved yet.
+  const me = useSession();
+  const myAssignments = me ? workspace.issues.filter(issue => issue.AssigneeId === me.id && stateOf(issue, workspace.jobs) !== "RESOLVED") : [];
   // Health: critical/high open issues or a failed Bob run on an open issue need attention.
   const projectHealth = workspace.projects.map(project => {
     const metrics = projectMetrics(project.id, workspace.issues, workspace.jobs);
@@ -96,6 +103,33 @@ const stats = [
           </div>
         ))}
       </div>
+
+      {/* Assigned to you (human fixes) */}
+      {myAssignments.length > 0 && (
+        <div className="bg-white border border-[#6287a2]/30 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-base font-bold text-[#6287a2] flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-[#5ec0ca]" /> Assigned to you
+            </h2>
+            <span className="text-xs text-slate-400">{myAssignments.length} to fix by hand</span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {myAssignments.map(issue => (
+              <Link key={issue.id} href={`/developer/issues/${encodeURIComponent(issue.id)}`}
+                className="px-5 py-3 flex items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-700 truncate">{issue.title}</p>
+                  <p className="text-xs text-slate-400">
+                    Issue #{issue.id} · {workspace.projects.find(project => project.id === issue.ProjekId)?.name ?? "Project"}
+                    {issue.severity && ` · ${issue.severity}`}
+                  </p>
+                </div>
+                <span className="text-xs font-semibold text-[#449199] shrink-0">Work on it →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Project Health Table */}

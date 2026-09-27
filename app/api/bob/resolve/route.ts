@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     return Response.json({ error: error instanceof Error ? error.message : "Cannot create job." }, { status: 503 });
   }
 
-  const secretValues = [process.env.BOBSHELL_API_KEY, process.env.BOB_API_KEY, process.env.SUPABASE_SERVICE_ROLE_KEY, process.env.GITHUB_TOKEN, process.env.DEVRESOLVE_REVIEW_TOKEN];
+  const secretValues = [process.env.BOBSHELL_API_KEY, process.env.BOB_API_KEY, process.env.SUPABASE_SERVICE_ROLE_KEY, process.env.GITHUB_TOKEN, process.env.DEVRESOLVE_SESSION_SECRET];
   type Progress = { type: "started" | "activity" | "heartbeat" | "result"; [key: string]: unknown };
   async function execute(send: (event: Progress) => void = () => {}) {
     send({ type: "started", jobId: job.jobId, issueId: job.issueId });

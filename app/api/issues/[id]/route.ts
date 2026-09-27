@@ -2,8 +2,8 @@ import { databaseId } from "@/lib/bob/request";
 import { requireRole, sessionFromRequest } from "@/lib/auth/session";
 import { viewerScope } from "@/lib/supabase/projects";
 import { canSeeProject } from "@/lib/auth/scope";
-import { getIssueDetail, saveTriage } from "@/lib/supabase/issues";
-import { profileNames } from "@/lib/auth/profiles";
+import { assignIssue, getIssueDetail, getResolution, listAssignments, saveTriage } from "@/lib/supabase/issues";
+import { listProfiles, profileNames } from "@/lib/auth/profiles";
 import { getProject } from "@/lib/supabase/bob-store";
 import { ISSUE_CATEGORIES, PRIORITY_LEVELS, SEVERITY_LEVELS, type PriorityLevel, type SeverityLevel } from "@/types/issues";
 
@@ -17,15 +17,22 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const [detail, scope] = await Promise.all([getIssueDetail(id), viewerScope(sessionFromRequest(request))]);
     // Reporters only see issues of their own projects; others look like missing issues.
     if (!detail || !canSeeProject(scope, detail.issue.project_id)) return Response.json({ error: "Issue not found." }, { status: 404 });
-    const [project, names] = await Promise.all([detail.issue.project_id ? getProject(detail.issue.project_id) : null, profileNames()]);
+    const [project, names, assignments, resolution] = await Promise.all([
+      detail.issue.project_id ? getProject(detail.issue.project_id) : null, profileNames(), listAssignments(), getResolution(id)]);
     const reporterName = names.get(String(detail.issue.reporter_id)) ?? null;
-    return Response.json({ ...detail, issue: { ...detail.issue, reporter_name: reporterName }, project }, { headers: { "Cache-Control": "no-store" } });
+    const assigneeId = assignments?.get(id) ?? null;
+    return Response.json({ ...detail, issue: { ...detail.issue, reporter_name: reporterName,
+      assignee_id: assigneeId, assignee_name: assigneeId ? names.get(assigneeId) ?? null : null },
+      // resolution: null = none yet; resolutionEnabled: false until docs/supabase-resolution.sql is run.
+      resolution: resolution ? { ...resolution, resolvedByName: resolution.resolvedBy ? names.get(resolution.resolvedBy) ?? null : null } : null,
+      resolutionEnabled: resolution !== undefined, project }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Cannot load issue." }, { status: 503 });
   }
 }
 
-// PATCH /api/issues/:id — manual triage override: { category?, severity?, priority? }
+// PATCH /api/issues/:id — developers only: triage override { category?, severity?, priority? }
+// and/or human assignment { assigneeId: "<developer profile id>" | null }.
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const denied = requireRole(request, "developer");
   if (denied) return denied;
@@ -46,10 +53,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!PRIORITY_LEVELS.includes(body.priority as PriorityLevel)) return Response.json({ error: "Invalid priority." }, { status: 400 });
     values.priority = body.priority as PriorityLevel;
   }
-  if (!Object.keys(values).length) return Response.json({ error: "Provide category, severity, or priority." }, { status: 400 });
+  const assigning = body.assigneeId !== undefined;
+  if (assigning && body.assigneeId !== null && !databaseId(body.assigneeId)) return Response.json({ error: "Invalid assignee." }, { status: 400 });
+  if (!Object.keys(values).length && !assigning) return Response.json({ error: "Provide category, severity, priority, or assigneeId." }, { status: 400 });
   try {
-    if (!await saveTriage(id, values, true)) return Response.json({ error: "Issue not found." }, { status: 404 });
-    return Response.json({ ok: true, ...values });
+    let assigneeId: string | null = null;
+    if (assigning && body.assigneeId !== null) {
+      // Issues are assigned to developers only (reporters cannot work on fixes).
+      const assignee = (await listProfiles()).find(profile => profile.id === databaseId(body.assigneeId));
+      if (!assignee || assignee.role !== "developer") return Response.json({ error: "Choose a developer to assign." }, { status: 400 });
+      assigneeId = assignee.id;
+    }
+    if (assigning && !await assignIssue(id, assigneeId)) return Response.json({ error: "Issue not found." }, { status: 404 });
+    if (Object.keys(values).length && !await saveTriage(id, values, true)) return Response.json({ error: "Issue not found." }, { status: 404 });
+    return Response.json({ ok: true, ...values, ...(assigning ? { assigneeId } : {}) });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Cannot update issue." }, { status: 503 });
   }

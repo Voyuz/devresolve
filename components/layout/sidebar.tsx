@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils";
 interface SidebarProps {
   isCollapsed: boolean;
   setIsCollapsed: (value: boolean) => void;
+  /** Open issues assigned to the signed-in developer, shown on the "Issues" menu item. */
+  assignedToMe?: number;
 }
 
-export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
+export function Sidebar({ isCollapsed, setIsCollapsed, assignedToMe = 0 }: SidebarProps) {
   const pathname = usePathname();
   const isDevMode = pathname.startsWith("/developer");
 
@@ -55,16 +57,24 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
       <nav className="flex-1 px-4 space-y-2">
         {menuItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href === "/developer/triage" && pathname.startsWith("/developer/issues/"));
+          const badge = item.href === "/developer/triage" ? assignedToMe : 0;
           return (
             <Link key={item.name} href={item.href}
+              title={badge ? `${badge} issue${badge > 1 ? "s" : ""} assigned to you` : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group text-body-main",
+                "relative flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group text-body-main",
                 isActive ? "bg-dev-cyan/10 text-dev-cyan font-bold" : "text-zinc-500 hover:bg-zinc-50 hover:text-dev-slate",
                 isCollapsed && "justify-center"
               )}>
               <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive ? "text-dev-cyan" : "text-zinc-400 group-hover:text-dev-slate")} />
               {!isCollapsed && <span className="truncate">{item.name}</span>}
+              {badge > 0 && (
+                <span className={cn("min-w-5 h-5 px-1.5 rounded-full bg-[#6287a2] text-white text-[11px] font-bold flex items-center justify-center",
+                  isCollapsed ? "absolute top-1 right-2" : "ml-auto")}>
+                  {badge}
+                </span>
+              )}
             </Link>
           );
         })}
