@@ -10,11 +10,9 @@ tokens, create a token for the owner and target demo repository, with repository
 repositories may require owner approval. Store the token only as `GITHUB_TOKEN`
 in ignored `.env.local`; never send it to Bob or the browser.
 
-`DEVRESOLVE_REVIEW_TOKEN` is a separate local reviewer access code generated in
-`.env.local`. Copy it locally into the password field in Human review. It is only
-sent to the local review endpoint, not stored in browser storage or sent to GitHub.
-This PoC restricts reviews to the local origin. Use `npm run dev -- --hostname
-127.0.0.1` for the demo. Deployment requires authenticated, authorized reviewers.
+Only signed-in developers can approve, request changes, or reject (checked in `proxy.ts`
+and in the review route). The route also accepts only same-origin JSON requests, so another
+site cannot trigger a publish with a developer's session. There is no separate reviewer code.
 
 Restart Next, submit a new issue, review the root cause, validation and actual Git
 diff, then select **Approve & save to GitHub** or **Reject**.

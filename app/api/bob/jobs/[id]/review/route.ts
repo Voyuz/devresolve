@@ -1,6 +1,5 @@
 import { claimReview, getJob, getReviewJob, saveReviewFeedback, updateJob } from "@/lib/supabase/bob-store";
 import { publishArtifact } from "@/lib/github/publish";
-import { timingSafeEqual } from "node:crypto";
 import { requireRole } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -8,19 +7,11 @@ export const runtime = "nodejs";
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const denied = requireRole(request, "developer");
   if (denied) return denied;
-  // Local PoC only until authenticated reviewer authorization is implemented.
+  // Reviewers are signed-in developers (checked above). Only accept JSON requests from this app's own pages,
+  // so another site cannot trigger a publish with a developer's session cookie (CSRF).
   const url = new URL(request.url);
-  if (!["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || request.headers.get("origin") !== url.origin ||
-    !request.headers.get("content-type")?.startsWith("application/json")) {
-    return Response.json({ error: "Review publishing is restricted to the local application. Remote use requires reviewer authentication." }, { status: 403 });
-  }
-  const configured = process.env.DEVRESOLVE_REVIEW_TOKEN?.trim();
-  const supplied = (request.headers.get("x-review-token") || "").trim();
-  if (!configured) return Response.json({ error: "Reviewer access code is not configured on this server. Set DEVRESOLVE_REVIEW_TOKEN in .env.local and restart Next.js." }, { status: 503 });
-  if (!supplied) return Response.json({ error: "Fill the Reviewer access code field before approving or rejecting." }, { status: 403 });
-  if (Buffer.byteLength(supplied) !== Buffer.byteLength(configured) ||
-    !timingSafeEqual(Buffer.from(supplied), Buffer.from(configured))) {
-    return Response.json({ error: "Reviewer access code does not match. Copy only the value after DEVRESOLVE_REVIEW_TOKEN= from .env.local, then restart the server if the value changed." }, { status: 403 });
+  if (request.headers.get("origin") !== url.origin || !request.headers.get("content-type")?.startsWith("application/json")) {
+    return Response.json({ error: "Review decisions must come from the DevResolve review page." }, { status: 403 });
   }
   const { id } = await context.params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return Response.json({ error: "Invalid job ID." }, { status: 400 });

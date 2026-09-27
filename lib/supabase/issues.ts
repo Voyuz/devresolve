@@ -132,3 +132,66 @@ export async function getAttentionCounts() {
   ]);
   return { running, awaitingReview, untriaged };
 }
+
+/** Open (not resolved) issues assigned to this developer; 0 when assignment is not set up. */
+export async function countAssignedTo(profileId: string) {
+  const { count, error } = await createSupabaseServerClient().from("issues")
+    .select("id", { count: "exact", head: true }).eq("assignee_id", profileId).neq("status", "resolved");
+  return error ? 0 : count ?? 0;
+}
+
+/**
+ * Human assignee per issue (issues.assignee_id, from docs/supabase-assignee.sql).
+ * Returns null when the column does not exist yet, so pages keep working before the migration.
+ */
+export async function listAssignments(): Promise<Map<string, string> | null> {
+  const { data, error } = await createSupabaseServerClient().from("issues")
+    .select("id::text,assignee_id::text").not("assignee_id", "is", null);
+  if (error) return null;
+  return new Map(((data ?? []) as unknown as { id: string; assignee_id: string }[]).map(row => [row.id, row.assignee_id]));
+}
+
+/** Assigns an issue to a developer (or clears it with null); a still-"reported" issue becomes "triaged". */
+export async function assignIssue(id: string, assigneeId: string | null) {
+  const db = createSupabaseServerClient();
+  const { data, error } = await db.from("issues")
+    .update({ assignee_id: assigneeId, updated_at: new Date().toISOString() }).eq("id", id).select("id").maybeSingle();
+  if (error) throw new Error(error.code === "42703" || error.code === "PGRST204"
+    ? "Developer assignment is not set up yet. Run docs/supabase-assignee.sql in Supabase."
+    : "Cannot update the assignee.");
+  if (!data) return false;
+  if (assigneeId) await db.from("issues").update({ status: "triaged" }).eq("id", id).eq("status", "reported");
+  return true;
+}
+
+export interface IssueResolution { note: string; url: string | null; resolvedBy: string | null; resolvedAt: string | null }
+
+/** Resolution note for an issue; null when docs/supabase-resolution.sql has not been run yet. */
+export async function getResolution(id: string): Promise<IssueResolution | null | undefined> {
+  const { data, error } = await createSupabaseServerClient().from("issues")
+    .select("resolution_note,resolution_url,resolved_by::text,resolved_at").eq("id", id).maybeSingle();
+  if (error) return undefined; // columns missing: feature not set up
+  const row = data as unknown as { resolution_note: string | null; resolution_url: string | null; resolved_by: string | null; resolved_at: string | null } | null;
+  return row?.resolution_note ? { note: row.resolution_note, url: row.resolution_url, resolvedBy: row.resolved_by, resolvedAt: row.resolved_at } : null;
+}
+
+const RESOLUTION_SETUP = "Resolution notes are not set up yet. Run docs/supabase-resolution.sql in Supabase.";
+
+/** Marks an issue resolved by a developer, with a note and an optional commit / PR link. */
+export async function resolveIssue(id: string, resolution: { note: string; url: string | null }, resolvedBy: string) {
+  const now = new Date().toISOString();
+  const { data, error } = await createSupabaseServerClient().from("issues")
+    .update({ status: "resolved", resolution_note: resolution.note, resolution_url: resolution.url, resolved_by: resolvedBy, resolved_at: now, updated_at: now })
+    .eq("id", id).select("id").maybeSingle();
+  if (error) throw new Error(error.code === "42703" || error.code === "PGRST204" ? RESOLUTION_SETUP : "Cannot resolve the issue.");
+  return Boolean(data);
+}
+
+/** Reopens a resolved issue (for mistakes): back to "triaged", resolution cleared. */
+export async function reopenIssue(id: string) {
+  const { data, error } = await createSupabaseServerClient().from("issues")
+    .update({ status: "triaged", resolution_note: null, resolution_url: null, resolved_by: null, resolved_at: null, updated_at: new Date().toISOString() })
+    .eq("id", id).select("id").maybeSingle();
+  if (error) throw new Error(error.code === "42703" || error.code === "PGRST204" ? RESOLUTION_SETUP : "Cannot reopen the issue.");
+  return Boolean(data);
+}

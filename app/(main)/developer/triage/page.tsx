@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Bug,
@@ -14,9 +14,14 @@ import {
   Sparkles,
   Loader2,
   Wand2,
+  Wrench,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/components/layout/use-workspace";
+import { useSession } from "@/components/layout/use-session";
+import { stateOf } from "@/components/layout/workspace-metrics";
+import { refreshBobStatus } from "@/components/layout/use-bob-status";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -48,6 +53,8 @@ interface RawIssue {
   reportedAt: string;
   reportedBy: string;
   assignedTo: AssignTarget;
+  /** Developer handling the issue when assignedTo is "human". */
+  assigneeName: string | null;
 }
 
 const SEVERITY_STYLE: Record<SeverityLevel, string> = {
@@ -109,7 +116,8 @@ export default function IssueTriagePage() {
     severity: (issue.severity as SeverityLevel | null) ?? null, priority: (issue.priority as PriorityLevel | null) ?? null,
     module: issue.CategoryIssues, reportedAt: formatDateTime(issue.created_at),
     reportedBy: issue.ReporterName || issue.ReporterId || "Team",
-    assignedTo: (() => { const job = workspace.jobs.find(job => job.issue_id === issue.id); return job && !["FAILED", "NEEDS_HUMAN_INTERVENTION"].includes(job.status) && job.review_status !== "REJECTED" ? "bob" : null; })(),
+    assignedTo: issue.AssigneeId ? "human" : (() => { const job = workspace.jobs.find(job => job.issue_id === issue.id); return job && !["FAILED", "NEEDS_HUMAN_INTERVENTION"].includes(job.status) && job.review_status !== "REJECTED" ? "bob" : null; })(),
+    assigneeName: issue.AssigneeId ? issue.AssigneeName || `Developer #${issue.AssigneeId}` : null,
   }));
   // Modal state
   const [selectedIssue, setSelectedIssue] = useState<RawIssue | null>(null);
@@ -120,6 +128,37 @@ export default function IssueTriagePage() {
   const [triageResults, setTriageResults] = useState<Record<string, TriageResult>>({});
   const [triageError, setTriageError] = useState("");
   const [bulkRunning, setBulkRunning] = useState(false);
+  // "Assign to Dev": developers who can take an issue instead of IBM Bob.
+  const me = useSession();
+  const [developers, setDevelopers] = useState<{ id: string; name: string }[]>([]);
+  const [devDropdown, setDevDropdown] = useState<string | null>(null);
+  const [modalAssignee, setModalAssignee] = useState("");
+  const assignmentHint = workspace.assignmentsEnabled === false
+    ? "Run docs/supabase-assignee.sql in Supabase to enable developer assignment" : undefined;
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/users", { cache: "no-store", signal: controller.signal })
+      .then(response => response.ok ? response.json() : { users: [] })
+      .then(body => setDevelopers((body.users as { id: string; name: string; role: string }[]).filter(user => user.role === "developer")))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  async function setAssignee(id: string, assigneeId: string | null) {
+    setDevDropdown(null);
+    setTriageError("");
+    try {
+      const response = await fetch(`/api/issues/${encodeURIComponent(id)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigneeId }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Cannot update the assignee.");
+      workspace.reload();
+      refreshBobStatus();
+    } catch (error) {
+      setTriageError(error instanceof Error ? error.message : "Cannot update the assignee.");
+    }
+  }
 
   const openDetail = (issue: RawIssue) => {
     setSelectedIssue(issue);
@@ -174,7 +213,11 @@ export default function IssueTriagePage() {
     rank(PRIORITY_LEVELS, b.priority) - rank(PRIORITY_LEVELS, a.priority) ||
     rank(SEVERITY_LEVELS, b.severity) - rank(SEVERITY_LEVELS, a.severity);
   const unassigned = issues.filter((i) => i.assignedTo === null).sort(byUrgency);
-  const assigned = issues.filter((i) => i.assignedTo !== null);
+  // Assigned to the signed-in developer and not resolved yet: shown first, as that developer's to-do list.
+  const mineIds = new Set(workspace.issues
+    .filter(issue => me && issue.AssigneeId === me.id && stateOf(issue, workspace.jobs) !== "RESOLVED").map(issue => issue.id));
+  const mine = issues.filter(issue => mineIds.has(issue.id)).sort(byUrgency);
+  const assigned = issues.filter((i) => i.assignedTo !== null && !mineIds.has(i.id));
   const untriagedCount = issues.filter((i) => !i.severity).length;
 
   return (
@@ -213,6 +256,35 @@ export default function IssueTriagePage() {
           </Badge>
         </div>
       </div>
+
+      {/* Assigned to you (fix by hand) */}
+      {mine.length > 0 && (
+        <div className="bg-white border border-[#6287a2]/30 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-base font-bold text-[#6287a2] flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-[#5ec0ca]" /> Assigned to you
+            </h2>
+            <span className="text-xs text-slate-400">{mine.length} to fix by hand</span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {mine.map(issue => (
+              <Link key={issue.id} href={`/developer/issues/${encodeURIComponent(issue.id)}`}
+                className="px-5 py-3 flex items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-slate-400">{issue.id}</span>
+                    <span className="text-sm font-medium text-slate-700 truncate">{issue.title}</span>
+                    <SeverityBadge severity={issue.severity} />
+                    <PriorityBadge priority={issue.priority} />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">{issue.client} · reported by {issue.reportedBy}</p>
+                </div>
+                <span className="text-xs font-semibold text-[#449199] shrink-0">Work on it →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Unassigned Issues */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
@@ -313,15 +385,35 @@ export default function IssueTriagePage() {
                       )}
                     </div>
 
-                    {/* Assign to Human */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled title="Human assignment is not configured"
-                      className="border-[#6287a2]/40 text-[#6287a2] hover:bg-[#6287a2]/5 text-xs gap-1"
-                    >
-                      <User className="w-3 h-3" /> Assign to Dev
-                    </Button>
+                    {/* Assign to a human developer */}
+                    <div className="relative">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={Boolean(assignmentHint)}
+                        title={assignmentHint ?? "Assign this issue to a developer instead of IBM Bob"}
+                        onClick={() => setDevDropdown(devDropdown === issue.id ? null : issue.id)}
+                        className="border-[#6287a2]/40 text-[#6287a2] hover:bg-[#6287a2]/5 text-xs gap-1"
+                      >
+                        <User className="w-3 h-3" /> Assign to Dev <ChevronDown className="w-3 h-3" />
+                      </Button>
+                      {devDropdown === issue.id && (
+                        <div className="absolute right-0 top-9 z-20 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden w-48">
+                          <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Developers</p>
+                          {developers.length === 0 && <p className="px-4 py-2 text-xs text-slate-400">No developer accounts</p>}
+                          {developers.map(developer => (
+                            <button
+                              key={developer.id}
+                              type="button"
+                              onClick={() => void setAssignee(issue.id, developer.id)}
+                              className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                            >
+                              {developer.name}{developer.id === me?.id && " (you)"}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
                     {/* Assign to Bob AI */}
                     <Button
@@ -362,18 +454,28 @@ export default function IssueTriagePage() {
               <div key={issue.id} className="px-5 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs text-slate-400">{issue.id}</span>
-                  <span className="text-sm text-slate-500">{issue.title}</span>
+                  <Link href={`/developer/issues/${encodeURIComponent(issue.id)}`} className="text-sm text-slate-500 hover:text-[#449199] hover:underline">
+                    {issue.title}
+                  </Link>
                   <SeverityBadge severity={issue.severity} />
                 </div>
-                <Badge
-                  className={`text-xs font-semibold ${
-                    issue.assignedTo === "bob"
-                      ? "bg-[#5ec0ca]/10 text-[#449199] border border-[#5ec0ca]/30"
-                      : "bg-[#6287a2]/10 text-[#50728a] border border-[#6287a2]/30"
-                  }`}
-                >
-                  {issue.assignedTo === "bob" ? "→ Bob AI" : "→ Human Dev"}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {issue.assignedTo === "human" && (
+                    <button type="button" onClick={() => void setAssignee(issue.id, null)}
+                      className="text-[11px] text-slate-400 hover:text-red-500 transition-colors">
+                      Unassign
+                    </button>
+                  )}
+                  <Badge
+                    className={`text-xs font-semibold ${
+                      issue.assignedTo === "bob"
+                        ? "bg-[#5ec0ca]/10 text-[#449199] border border-[#5ec0ca]/30"
+                        : "bg-[#6287a2]/10 text-[#50728a] border border-[#6287a2]/30"
+                    }`}
+                  >
+                    {issue.assignedTo === "bob" ? "→ Bob AI" : `→ ${issue.assigneeName}`}
+                  </Badge>
+                </div>
               </div>
             ))}
           </div>
@@ -447,9 +549,24 @@ export default function IssueTriagePage() {
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2 p-5 border-t border-slate-100 bg-slate-50/60 rounded-b-2xl">
+            <select
+              value={modalAssignee}
+              onChange={event => setModalAssignee(event.target.value)}
+              disabled={Boolean(assignmentHint)}
+              title={assignmentHint}
+              aria-label="Developer to assign"
+              className="h-9 rounded-md border border-[#6287a2]/40 bg-white px-2 text-sm text-slate-600"
+            >
+              <option value="">Choose a developer…</option>
+              {developers.map(developer => (
+                <option key={developer.id} value={developer.id}>{developer.name}{developer.id === me?.id ? " (you)" : ""}</option>
+              ))}
+            </select>
             <Button
               variant="outline"
-              disabled title="Human assignment is not configured"
+              disabled={Boolean(assignmentHint) || !modalAssignee}
+              title={assignmentHint}
+              onClick={() => { if (selectedIssue) { void setAssignee(selectedIssue.id, modalAssignee); setIsDetailOpen(false); setModalAssignee(""); } }}
               className="border-[#6287a2]/40 text-[#6287a2] hover:bg-[#6287a2]/5 font-semibold gap-1.5"
             >
               <User className="w-4 h-4" /> Assign to Human Dev

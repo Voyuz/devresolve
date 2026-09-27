@@ -1,5 +1,6 @@
 import { checkBobAvailability } from "@/lib/bob/runner";
-import { getAttentionCounts } from "@/lib/supabase/issues";
+import { countAssignedTo, getAttentionCounts } from "@/lib/supabase/issues";
+import { sessionFromRequest } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,11 +16,14 @@ async function availability() {
   return cachedAvailability;
 }
 
-// GET /api/bob/status — whether this server can run Bob, plus work waiting for developers.
-export async function GET() {
+// GET /api/bob/status — whether this server can run Bob, plus work waiting for developers
+// (assignedToMe: open issues assigned to the signed-in developer).
+export async function GET(request: Request) {
   try {
-    const [bob, counts] = await Promise.all([availability(), getAttentionCounts()]);
-    return Response.json({ ready: bob.ready, reason: bob.reason, ...counts }, { headers: { "Cache-Control": "no-store" } });
+    const session = sessionFromRequest(request);
+    const [bob, counts, assignedToMe] = await Promise.all([availability(), getAttentionCounts(),
+      session?.role === "developer" ? countAssignedTo(session.id) : 0]);
+    return Response.json({ ready: bob.ready, reason: bob.reason, ...counts, assignedToMe }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Cannot load status." }, { status: 503 });
   }

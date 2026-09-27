@@ -13,6 +13,7 @@
     "test:workspace": "node --test tests/workspace.test.mjs",
     "test:triage": "node --test tests/triage.test.mjs",
     "test:auth": "node --test tests/auth.test.mjs",
+    "test:resolution": "node --test tests/resolution.test.mjs",
     "test:setup": "node --test tests/bob-setup.test.mjs"
   },
   "dependencies": {

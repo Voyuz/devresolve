@@ -100,7 +100,7 @@ test('changed base branch and an unrelated existing fix branch block publication
   await assert.rejects(publishArtifact(options,githubMock({exists:true}).fetcher),/different content/i);
 });
 
-test('review requires same origin and reviewer code; reject and concurrent claims cannot publish',async()=>{
+test('review requires same origin JSON requests; reject and concurrent claims cannot publish',async()=>{
   let published=0,claimed=false;
   const job={status:'READY_FOR_REVIEW',artifact:options.artifact,result:{review:{branch:options.branch}},repo_url:options.repoUrl,base_branch:'main'};
   const modules={
@@ -111,13 +111,13 @@ test('review requires same origin and reviewer code; reject and concurrent claim
   };
   const exports={};
   vm.runInNewContext(ts.transpileModule(await readFile('app/api/bob/jobs/[id]/review/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
-    {exports,require:n=>modules[n],Response,URL,Buffer,Error,process:{env:{DEVRESOLVE_REVIEW_TOKEN:'review-fixture',GITHUB_TOKEN:'fixture'}}});
-  const request=(decision,origin='http://localhost',token='review-fixture')=>new Request('http://localhost/api/review',{method:'POST',headers:{origin,'content-type':'application/json','x-review-token':token},body:JSON.stringify({decision})});
+    {exports,require:n=>modules[n],Response,URL,Buffer,Error,process:{env:{GITHUB_TOKEN:'fixture'}}});
+  const request=(decision,origin='http://localhost',type='application/json')=>new Request('http://localhost/api/review',{method:'POST',headers:{origin,'content-type':type},body:JSON.stringify({decision})});
   const context={params:Promise.resolve({id:'037ae2c5-26b6-4f13-a4d6-6a396bc33be7'})};
-  assert.equal((await exports.POST(request('approve','https://other.example'),context)).status,403);
-  assert.equal((await exports.POST(request('approve','http://localhost','wrong'),context)).status,403);
-  assert.equal((await exports.POST(request('approve','http://localhost',''),context)).status,403);
-  assert.equal((await exports.POST(request('reject','http://localhost',' review-fixture '),context)).status,200);
+  assert.equal((await exports.POST(request('approve','https://other.example'),context)).status,403,'cross-site request');
+  assert.equal((await exports.POST(request('approve','http://localhost','text/plain'),context)).status,403,'non-JSON form post');
+  assert.equal(published,0);
+  assert.equal((await exports.POST(request('reject'),context)).status,200);
   assert.equal(published,0);
   assert.equal((await exports.POST(request('approve'),context)).status,409);
   assert.equal(published,0);
@@ -139,8 +139,8 @@ test('request changes requires feedback, stores it, and never publishes',async()
   };
   const exports={};
   vm.runInNewContext(ts.transpileModule(await readFile('app/api/bob/jobs/[id]/review/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
-    {exports,require:n=>modules[n],Response,URL,Buffer,Error,process:{env:{DEVRESOLVE_REVIEW_TOKEN:'review-fixture',GITHUB_TOKEN:'fixture'}}});
-  const request=body=>new Request('http://localhost/api/review',{method:'POST',headers:{origin:'http://localhost','content-type':'application/json','x-review-token':'review-fixture'},body:JSON.stringify(body)});
+    {exports,require:n=>modules[n],Response,URL,Buffer,Error,process:{env:{GITHUB_TOKEN:'fixture'}}});
+  const request=body=>new Request('http://localhost/api/review',{method:'POST',headers:{origin:'http://localhost','content-type':'application/json'},body:JSON.stringify(body)});
   const context={params:Promise.resolve({id:job.id})};
   assert.equal((await exports.POST(request({decision:'request_changes'}),context)).status,400);
   assert.equal((await exports.POST(request({decision:'request_changes',feedback:'   '}),context)).status,400);

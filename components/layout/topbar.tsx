@@ -5,17 +5,16 @@ import { signOut, getSession } from "@/app/auth/actions";
 import { useEffect, useState } from "react";
 import type { SessionUser } from "@/types/issues";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useBobStatus } from "@/components/layout/use-bob-status";
+import type { BobStatus } from "@/components/layout/use-bob-status";
 import Link from "next/link";
 
-export function TopBar() {
+export function TopBar({ bob }: { bob: BobStatus | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
   const isDeveloper = user?.role === "developer";
   const inDeveloperView = pathname.startsWith("/developer");
   // Developer to-dos: fixes awaiting review and untriaged reports.
-  const bob = useBobStatus();
   const pending = bob ? bob.awaitingReview + bob.untriaged : 0;
   const pendingTitle = bob ? `${bob.awaitingReview} fix(es) awaiting review · ${bob.untriaged} untriaged report(s)` : "Loading notifications";
 
