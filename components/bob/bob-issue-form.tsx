@@ -6,6 +6,7 @@ import type { BobResolveResult, BobActivityEvent, BobProject, BobStoredJob } fro
 import { formatDateTime } from "@/lib/utils";
 import { explainReason, roundState, TONE_CLASS } from "@/components/bob/round-status";
 import { PatchView } from "@/components/bob/patch-view";
+import { isRunningJob, resultFromJob } from "@/components/bob/saved-result";
 
 const KIND_ICON: Record<string, string> = {
   repository_loaded: "📂",
@@ -18,14 +19,6 @@ const KIND_ICON: Record<string, string> = {
   error: "❌",
   info: "ℹ️",
 };
-
-// Saved results may be partial (legacy or manually edited rows); fill required fields from the job.
-function resultFromJob(job: BobStoredJob): BobResolveResult | null {
-  if (!job.result) return null;
-  const stored = job.result as Partial<BobResolveResult>;
-  return { ...stored, jobId: stored.jobId ?? job.id, issueId: stored.issueId ?? job.issue_id,
-    status: stored.status ?? job.status, changedFiles: stored.changedFiles ?? [], activity: stored.activity ?? [] };
-}
 
 // Bob's self-correction inside one run: how often it validated, and how often validation failed.
 function validationStats(activity: BobActivityEvent[]) {
@@ -132,6 +125,33 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
     void loadPreviousFeedback();
     return () => controller.abort();
   }, [requestedJobId, previousJobId]);
+
+  // Reopened running jobs have no live stream; keep their saved status current.
+  const pollingJobId = savedJob && isRunningJob(savedJob.status) ? savedJob.id : null;
+  useEffect(() => {
+    if (!pollingJobId || loading) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const response = await fetch(`/api/bob/jobs/${encodeURIComponent(pollingJobId!)}`, {
+          cache: "no-store", signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Cannot refresh saved job.");
+        if (controller.signal.aborted) return;
+        setSavedJob(data.job);
+        setResult(resultFromJob(data.job));
+        if (!isRunningJob(data.job.status)) return;
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setRequestError(error instanceof Error ? error.message : "Cannot refresh saved job.");
+      }
+      timer = setTimeout(poll, 3000);
+    }
+    timer = setTimeout(poll, 3000);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [pollingJobId, loading]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
