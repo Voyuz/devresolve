@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, Suspense } from "react";
+import Link from "next/link";
 import { useWorkspace } from "@/components/layout/use-workspace";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -107,9 +108,14 @@ function NewIssueForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const workspace = useWorkspace();
-  const [chosenProject, setChosenProject] = useState(params.get("projectId") ?? "");
-  const projectId = chosenProject || workspace.projects[0]?.id || "";
-  const projectName = workspace.projects.find(project => project.id === projectId)?.name || "Select a project";
+  // The project is chosen on the Projects page (?projectId=) and cannot be changed here. With no choice in the URL,
+  // a reporter who owns exactly one project gets that one; otherwise they must pick on the Projects page.
+  const requestedProject = params.get("projectId");
+  const project = requestedProject
+    ? workspace.projects.find(item => item.id === requestedProject)
+    : workspace.projects.length === 1 ? workspace.projects[0] : undefined;
+  const projectId = project?.id ?? "";
+  const projectName = project?.name ?? (workspace.loading ? "Loading..." : "No project selected");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -148,8 +154,11 @@ function NewIssueForm() {
       const response = await fetch("/api/issues", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, issue: { title,
-          description: [description, actual && "Actual behavior: " + actual, steps && "Steps to reproduce: " + steps, logError && "Log: " + logError].filter(Boolean).join("\n\n"),
+          // Steps have no dedicated column; actual behavior and the log are stored in their own columns.
+          description: [description, steps && "Steps to reproduce: " + steps].filter(Boolean).join("\n\n"),
           expectedBehavior: expected,
+          actualBehavior: actual || undefined,
+          errorLog: logError || undefined,
           screenshotRef: attachments.map(file => file.name + " (" + file.size + " bytes, " + file.type + ")").join("; ").slice(0, 2000),
         } }),
       });
@@ -208,14 +217,14 @@ function NewIssueForm() {
             </span>
             <FolderOpen size={12} className="text-dev-cyan" />
             <span className="text-[12px] font-bold text-dev-cyan">
-              {projectName} ({projectId})
+              {projectName}{projectId && ` (${projectId})`}
             </span>
           </div>
         </div>
 
         {/* title + subtitle */}
         <h1 className="text-2xl font-bold text-dev-slate leading-tight mb-2">
-          Submit Bug / Issue for {projectName}
+          {project ? `Submit Bug / Issue for ${project.name}` : "Submit a Bug Report"}
         </h1>
         <p className="text-dev-slate/50 text-sm leading-relaxed">
           Describe the bug. A developer will review the report and start Bob investigation.
@@ -248,11 +257,24 @@ function NewIssueForm() {
       {/* ── Form fields ─────────────────────────────────────────────────────── */}
       <form onSubmit={handleSubmit} className="space-y-5">
         {(error || workspace.error) && <p role="alert" className="text-red-600">{error || workspace.error}</p>}
-        <Section><FieldLabel required>Project</FieldLabel>
-          <select value={projectId} onChange={e => setChosenProject(e.target.value)} className={inputCls} disabled={workspace.loading} required>
-            <option value="" disabled>Select a project</option>
-            {workspace.projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
-          </select>
+        <Section><FieldLabel required hint="Chosen on the Projects page">Project</FieldLabel>
+          <input
+            type="text"
+            value={projectName}
+            readOnly
+            aria-readonly="true"
+            tabIndex={-1}
+            onKeyDown={e => e.preventDefault()}
+            className={`${inputCls} bg-zinc-50 cursor-default select-none ${project ? "text-dev-slate font-semibold" : "text-zinc-400"}`}
+          />
+          {!workspace.loading && !project && (
+            <p className="mt-2 text-xs text-dev-terracotta">
+              {requestedProject ? "This project is not available to your account." : "Choose the project this bug belongs to."}
+            </p>
+          )}
+          <Link href="/projects" className="mt-2 inline-block text-xs font-semibold text-dev-cyan hover:underline">
+            {project ? "Change project" : "Choose a project"} →
+          </Link>
         </Section>
 
         {/* Bug Title */}

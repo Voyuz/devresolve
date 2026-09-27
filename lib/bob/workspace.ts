@@ -9,9 +9,9 @@
  */
 
 import { execFile } from "child_process";
-import { mkdtemp, rm } from "fs/promises";
+import { access, mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
-import { basename, isAbsolute, join, relative, resolve } from "path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "path";
 import { promisify } from "util";
 import { gitEnvironment } from "./git-environment.ts";
 
@@ -91,7 +91,8 @@ export async function createWorkspace(
     if (!child || child.startsWith("..") || isAbsolute(child) || !basename(workspacePath).startsWith("devresolve-")) {
       throw new Error("Refusing cleanup outside the DevResolve temporary workspace.");
     }
-    await rm(workspacePath, { recursive: true, force: true });
+    // Windows antivirus/indexers briefly lock new files (EBUSY/EPERM); retry before giving up.
+    await rm(workspacePath, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
   };
 
   try {
@@ -116,4 +117,26 @@ export async function createWorkspace(
   }
 
   return { workspacePath, fixBranch, branchName: fixBranch, repoUrl, cleanup };
+}
+
+/**
+ * Pre-installs npm dependencies (from package-lock.json) before Bob starts.
+ * A cold `npm install` inside the Bob session can exceed Bob's idle watchdog
+ * because Bob emits no output while the command runs. Returns false when
+ * skipped or failed; Bob can still install dependencies itself.
+ */
+export async function installDependencies(workspacePath: string): Promise<boolean> {
+  try { await access(join(workspacePath, "package-lock.json")); } catch { return false; }
+  // Run npm through node directly: execFile cannot launch npm.cmd without a shell on Windows.
+  const npmCli = join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+  const launch: { command: string; prefix: string[] } = process.platform === "win32" ? { command: process.execPath, prefix: [npmCli] } : { command: "npm", prefix: [] };
+  // Same credential-free environment as Git; NODE_ENV=production would skip devDependencies (tests/build need them).
+  const env: NodeJS.ProcessEnv = { ...gitEnvironment(), NODE_ENV: "development" };
+  try {
+    await execFileAsync(launch.command, [...launch.prefix, "ci", "--prefer-offline", "--no-audit", "--no-fund"],
+      { cwd: workspacePath, timeout: 600_000, maxBuffer: 16 * 1024 * 1024, env, windowsHide: true });
+    return true;
+  } catch {
+    return false;
+  }
 }

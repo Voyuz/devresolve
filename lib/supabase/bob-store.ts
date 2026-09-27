@@ -1,6 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { BobArtifact, BobIssue, BobProject, BobResolveResult, BobReviewStatus, BobStoredJob } from "@/types/bob";
+import type { BobArtifact, BobIssue, BobJobRound, BobProject, BobResolveResult, BobReviewStatus, BobStoredJob } from "@/types/bob";
 import { persistReviewArtifact } from "./review-persistence.ts";
 
 type ProjectRow = { id: string; NameProjek: string; RepoUrl: string; DefaultBranch: string };
@@ -23,11 +23,11 @@ export async function getProject(id: string) {
   return data ? projectFromRow(data as unknown as ProjectRow) : null;
 }
 
-export async function createJob(project: BobProject, issue: BobIssue) {
+export async function createJob(project: BobProject, issue: BobIssue, reporterId?: string) {
   const { data, error } = await createSupabaseServerClient().rpc("create_bob_issue_job", {
     p_project_id: project.id, p_title: issue.title, p_description: issue.description,
     p_expected_behavior: issue.expectedBehavior ?? null, p_screenshot_ref: issue.screenshotRef ?? null,
-    p_reporter_id: process.env.DEVRESOLVE_DEMO_REPORTER_ID || "demo",
+    p_reporter_id: reporterId || process.env.DEVRESOLVE_DEMO_REPORTER_ID || "demo",
     p_category: process.env.DEVRESOLVE_DEMO_ISSUE_CATEGORY || "BUG",
     p_issue_status: process.env.DEVRESOLVE_DEMO_ISSUE_STATUS || "OPEN",
   });
@@ -71,11 +71,28 @@ export async function getJob(id: string): Promise<BobStoredJob | null> {
     job.result.review.error = review.review_error || undefined;
     if (review.review_status === "APPROVED") job.result.branch = job.result.review.branch;
   }
+  job.history = await listIssueRounds(job.issue_id);
   return job;
+}
+
+/** Every Bob run for an issue, oldest first; each run is one review round. */
+export async function listIssueRounds(issueId: string): Promise<BobJobRound[]> {
+  const { data, error } = await createSupabaseServerClient().from("bob_jobs")
+    .select("id,status,review_status,created_at,feedback:result->review->>feedback")
+    .eq("issue_id", issueId).order("created_at", { ascending: true });
+  if (error) return [];
+  return (data ?? []) as unknown as BobJobRound[];
+}
+
+/** Stores the reviewer's requested changes alongside the saved review. */
+export async function saveReviewFeedback(id: string, result: BobResolveResult, feedback: string) {
+  if (!result.review) throw new Error("This job has no saved review.");
+  await updateJob(id, { result: { ...result, review: { ...result.review, feedback } } });
 }
 
 export interface ReviewJob {
   id: string;
+  issue_id: string;
   status: string;
   repo_url: string;
   base_branch: string;
@@ -88,14 +105,17 @@ export interface ReviewJob {
 
 export async function getReviewJob(id: string): Promise<ReviewJob> {
   const { data, error } = await createSupabaseServerClient().from("bob_jobs")
-    .select("id,status,repo_url,base_branch,artifact,result,review_status,review_error,published_commit_url").eq("id", id).single();
+    .select("id,issue_id::text,status,repo_url,base_branch,artifact,result,review_status,review_error,published_commit_url").eq("id", id).single();
   if (error || !data) throw new Error("Cannot load review. Run docs/supabase-review.sql and check the job ID.");
   return data as ReviewJob;
 }
 
-export async function claimReview(id: string, decision: "approve" | "reject") {
+export type ReviewDecision = "approve" | "reject" | "request_changes";
+
+export async function claimReview(id: string, decision: ReviewDecision) {
+  const next = decision === "approve" ? "PUBLISHING" : decision === "reject" ? "REJECTED" : "CHANGES_REQUESTED";
   const { data, error } = await createSupabaseServerClient().from("bob_jobs")
-    .update({ review_status: decision === "approve" ? "PUBLISHING" : "REJECTED", review_error: null })
+    .update({ review_status: next, review_error: null })
     .eq("id", id).eq("status", "READY_FOR_REVIEW").in("review_status", decision === "approve" ? ["PENDING", "PUBLISH_FAILED"] : ["PENDING"])
     .select("id").maybeSingle();
   if (error) throw new Error("Cannot save review decision.");

@@ -1,40 +1,28 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { createProfile, validateCredentials } from "@/lib/auth/profiles";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session";
 
+// Developer-only: creates a reporter account ("user" role). Server actions are callable directly,
+// so the caller's signed session is checked here rather than relying on the page being hidden.
 export async function registerUser(formData: FormData) {
-  const namaUser = (formData.get("namaUser") as string)?.trim();
-  const sandiUser = formData.get("sandiUser") as string;
-  const role = (formData.get("role") as string) || "user"; // Just in case there is a role column later
+  const session = verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value);
+  if (session?.role !== "developer") return { error: "Only developers can register users." };
 
-  if (!namaUser || !sandiUser) {
-    return { error: "Username and password are required." };
+  let credentials;
+  try {
+    credentials = validateCredentials({ name: formData.get("namaUser"), password: formData.get("sandiUser") });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Invalid username or password." };
   }
-
-  const supabase = createAdminClient();
-
-  // Check if user already exists
-  const { data: existingUser } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("NamaUser", namaUser)
-    .single();
-
-  if (existingUser) {
-    return { error: "Username is already registered. Please choose another username." };
+  try {
+    const profile = await createProfile(credentials.name, credentials.password);
+    revalidatePath("/developer");
+    return { success: true, message: `User '${profile.name}' has been successfully registered!` };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    return { error: message.includes("taken") ? "Username is already registered. Please choose another username." : "Failed to register new user. A server error occurred." };
   }
-
-  // Insert new user
-  const { error } = await supabase
-    .from("profiles")
-    .insert([{ NamaUser: namaUser, SandiUser: sandiUser }]);
-
-  if (error) {
-    console.error("[registerUser] Supabase error:", error);
-    return { error: "Failed to register new user. A server error occurred." };
-  }
-
-  revalidatePath("/developer");
-  return { success: true, message: `User '${namaUser}' has been successfully registered!` };
 }

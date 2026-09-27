@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { Globe, GitBranch, User, ChevronRight, Zap, AlertOctagon, ArrowUpCircle, Minus } from "lucide-react";
+import { Globe, GitBranch, Clock, ChevronRight, Zap, AlertOctagon, ArrowUpCircle, Minus, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 // ─── Urgency config ───────────────────────────────────────────────────────────
@@ -13,12 +13,25 @@ const URGENCY_CONFIG: Record<
   CRITICAL: { label: "Critical",  className: "bg-red-100 text-red-600 border-red-200",       icon: AlertOctagon  },
   HIGH:     { label: "High",      className: "bg-orange-100 text-orange-600 border-orange-200", icon: ArrowUpCircle },
   MEDIUM:   { label: "Medium",    className: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Minus         },
-  LOW:      { label: "Unclassified",       className: "bg-zinc-100 text-zinc-500 border-zinc-200",     icon: Minus         },
+  LOW:      { label: "Low",       className: "bg-zinc-100 text-zinc-500 border-zinc-200",     icon: Minus         },
+  NONE:     { label: "No open issues", className: "bg-green-50 text-green-700 border-green-200", icon: CheckCircle2 },
 };
 
-export function ProjectCard({ project }: { project: { id: string; name: string; status: string; description: string; techStack: string[]; repository: string; branch: string; reporter: string; urgency: string; stats: { total: number; critical: number; resolved: number; inProgress: number } } }) {
+// Repository status from the GitHub check (see lib/github/repo-info.ts).
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  CONNECTED:      { label: "Connected",       className: "bg-dev-mint/10 text-dev-mint border-dev-mint/20" },
+  CHECKING:       { label: "Checking…",       className: "bg-dev-slate/5 text-dev-slate/60 border-dev-slate/10" },
+  BRANCH_MISSING: { label: "Branch missing",  className: "bg-dev-sand/10 text-dev-terracotta border-dev-sand/30" },
+  ARCHIVED:       { label: "Archived",        className: "bg-dev-sand/10 text-dev-terracotta border-dev-sand/30" },
+  NOT_FOUND:      { label: "Repo not found",  className: "bg-red-50 text-red-600 border-red-200" },
+  INVALID_URL:    { label: "Invalid repo URL", className: "bg-red-50 text-red-600 border-red-200" },
+  UNAVAILABLE:    { label: "GitHub unreachable", className: "bg-dev-slate/5 text-dev-slate/60 border-dev-slate/10" },
+};
+
+export function ProjectCard({ project }: { project: { id: string; name: string; status: string; description: string; techStack: string[]; repository: string; branch: string; lastActivity: string; urgency: string; stats: { total: number; critical: number; resolved: number; inProgress: number } } }) {
   const router = useRouter();
   const urgency = URGENCY_CONFIG[project.urgency] ?? URGENCY_CONFIG.LOW;
+  const status = STATUS_CONFIG[project.status] ?? STATUS_CONFIG.UNAVAILABLE;
   const UrgencyIcon = urgency.icon;
 
   return (
@@ -33,15 +46,7 @@ export function ProjectCard({ project }: { project: { id: string; name: string; 
           <Badge className="bg-dev-slate/5 text-dev-slate border-dev-slate/10 text-[10px] font-bold">
             {project.id}
           </Badge>
-          <Badge
-            className={
-              project.status === "ACTIVE"
-                ? "bg-dev-mint/10 text-dev-mint border-dev-mint/20"
-                : "bg-dev-sand/10 text-dev-sand border-dev-sand/20"
-            }
-          >
-            {project.status}
-          </Badge>
+          <Badge className={status.className}>{status.label}</Badge>
           {/* Urgency badge */}
           <span
             className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${urgency.className}`}
@@ -51,10 +56,10 @@ export function ProjectCard({ project }: { project: { id: string; name: string; 
           </span>
         </div>
 
-        {/* Reporter */}
+        {/* Latest report */}
         <div className="flex items-center gap-1.5 text-dev-slate/50 shrink-0">
-          <User size={13} />
-          <span className="text-[11px] font-bold uppercase tracking-tight">{project.reporter}</span>
+          <Clock size={13} />
+          <span className="text-[11px] font-semibold">{project.lastActivity}</span>
         </div>
       </div>
 
@@ -71,7 +76,7 @@ export function ProjectCard({ project }: { project: { id: string; name: string; 
         {project.techStack.map((tech: string) => (
           <span
             key={tech}
-            className="bg-[#f8fafc] text-dev-slate/70 text-[10px] px-3 py-1.5 rounded-lg border border-dev-slate/5 font-medium"
+            className="bg-slate-50 text-dev-slate/70 text-[10px] px-3 py-1.5 rounded-lg border border-dev-slate/5 font-medium"
           >
             {tech}
           </span>
@@ -79,7 +84,7 @@ export function ProjectCard({ project }: { project: { id: string; name: string; 
       </div>
 
       {/* ── Repo Details ── */}
-      <div className="bg-[#fcfcfd] rounded-2xl p-4 border border-dev-slate/5 mb-8 space-y-3">
+      <div className="bg-background rounded-2xl p-4 border border-dev-slate/5 mb-8 space-y-3">
         <div className="flex justify-between items-center text-[12px]">
           <div className="flex items-center gap-2 text-dev-slate/50 font-medium">
             <Globe size={14} /> Repository

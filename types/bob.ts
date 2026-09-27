@@ -44,6 +44,8 @@ export interface BobIssue {
   title: string;
   description: string;
   expectedBehavior?: string;
+  actualBehavior?: string;
+  errorLog?: string;
   screenshotRef?: string;
 }
 
@@ -73,6 +75,8 @@ export interface BobResolveResult {
   validationSummary?: string;
   /** Ordered list of observable activity from the Bob session */
   activity: BobActivityEvent[];
+  /** Earlier job whose review requested the changes this run addresses */
+  previousJobId?: string;
 }
 
 export interface BobArtifact {
@@ -82,13 +86,24 @@ export interface BobArtifact {
   files: { path: string; mode: "100644" | "100755"; content: string | null }[];
 }
 
-export type BobReviewStatus = "PENDING" | "PUBLISHING" | "APPROVED" | "REJECTED" | "PUBLISH_FAILED";
+export type BobReviewStatus = "PENDING" | "PUBLISHING" | "APPROVED" | "REJECTED" | "PUBLISH_FAILED" | "CHANGES_REQUESTED";
 export interface BobReview {
   status: BobReviewStatus;
   patch: string;
   branch: string;
   commitUrl?: string;
   error?: string;
+  /** Reviewer's requested changes, when status is CHANGES_REQUESTED */
+  feedback?: string;
+}
+
+/** One Bob run for an issue; runs are review rounds, oldest first. */
+export interface BobJobRound {
+  id: string;
+  status: BobJobStatus;
+  review_status: BobReviewStatus | null;
+  created_at: string;
+  feedback: string | null;
 }
 
 export interface BobStoredJob {
@@ -98,4 +113,6 @@ export interface BobStoredJob {
   result: BobResolveResult | null;
   created_at: string;
   finished_at: string | null;
+  /** All runs for the same issue, oldest first (review rounds). */
+  history?: BobJobRound[];
 }

@@ -1,55 +1,32 @@
-import { getSession } from "@/app/auth/actions";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { redirect } from "next/navigation";
+"use client";
+
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Home, Tag, CheckCircle2, Bot, Clock } from "lucide-react";
-import type { Issue } from "@/types/issues";
+import { useWorkspace } from "@/components/layout/use-workspace";
+import { stateOf } from "@/components/layout/workspace-metrics";
+import { formatDateTime } from "@/lib/utils";
 import DashboardClient from "./DashboardClient";
 
-async function getStats() {
-  const supabase = createAdminClient();
-  const { data: issues } = await supabase
-    .from("issues")
-    .select("id, Status");
+// Layout from main; data from the signed-in user's workspace (reporters see their own projects, developers all).
 
-  if (!issues) return { total: 0, open: 0, inProgress: 0, resolved: 0 };
-
-  return {
-    total: issues.length,
-    open: issues.filter((i: Issue) => i.Status === "open" || i.Status === "triaged").length,
-    inProgress: issues.filter((i: Issue) => i.Status === "in_progress").length,
-    resolved: issues.filter((i: Issue) => i.Status === "resolved").length,
-    pendingReview: issues.filter((i: Issue) => i.Status === "ready_for_review").length,
-  };
-}
-
-async function getRecentIssues() {
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("issues")
-    .select("id, title, Status, CategoryIssues, created_at")
-    .order("created_at", { ascending: false })
-    .limit(5);
-  return (data as Issue[]) ?? [];
-}
-
-const statusColor: Record<string, string> = {
-  open: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  triaged: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
-  in_progress: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-  ready_for_review: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
-  resolved: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-  needs_human_intervention: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+const STATE_LABEL: Record<string, { label: string; className: string }> = {
+  OPEN: { label: "Open", className: "bg-blue-100 text-blue-700" },
+  IN_PROGRESS: { label: "In progress", className: "bg-purple-100 text-purple-700" },
+  PENDING_REVIEW: { label: "Awaiting review", className: "bg-orange-100 text-orange-700" },
+  RESOLVED: { label: "Resolved", className: "bg-green-100 text-green-700" },
 };
 
-export default async function DashboardPage() {
-  const session = await getSession();
-  if (!session) redirect("/auth/login");
-
-  const [stats, recentIssues] = await Promise.all([getStats(), getRecentIssues()]);
+export default function DashboardPage() {
+  const workspace = useWorkspace();
+  const states = workspace.issues.map(issue => ({ issue, state: stateOf(issue, workspace.jobs) }));
+  const count = (state: string) => states.filter(entry => entry.state === state).length;
+  const stats = { total: states.length, resolved: count("RESOLVED"), inProgress: count("IN_PROGRESS"), pendingReview: count("PENDING_REVIEW") };
+  const recentIssues = [...states].sort((a, b) => b.issue.created_at.localeCompare(a.issue.created_at)).slice(0, 5);
 
   return (
     <div className="space-y-8">
+      {workspace.error && <p role="alert" className="text-red-600">{workspace.error}</p>}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#6287a2] flex items-center gap-2">
@@ -74,7 +51,7 @@ export default async function DashboardPage() {
             >
               <div>
                 <p className="text-slate-500 text-sm font-medium">{s.label}</p>
-                <p className={`text-3xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+                <p className={`text-3xl font-bold mt-1 ${s.color}`}>{workspace.loading ? "…" : s.value}</p>
               </div>
               <div className="p-3 bg-white/60 rounded-lg border border-white/80">
                 <s.icon className={`w-5 h-5 ${s.color}`} />
@@ -89,20 +66,24 @@ export default async function DashboardPage() {
             <CardTitle>Recent Issues</CardTitle>
           </CardHeader>
           <CardContent>
-            {recentIssues.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No issues yet. <a href="/issues/new" className="underline">Create your first issue</a>.</p>
+            {workspace.loading ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">Loading issues...</p>
+            ) : recentIssues.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No issues yet. <Link href="/projects" className="underline">Create your first issue</Link>.</p>
             ) : (
               <div className="divide-y">
-                {recentIssues.map((issue) => (
+                {recentIssues.map(({ issue, state }) => (
                   <div key={issue.id} className="flex items-center justify-between py-3">
                     <div className="space-y-0.5">
-                      <a href={`/issues/${issue.id}`} className="text-sm font-medium hover:underline">
-                        {issue.title ?? "(Untitled)"}
-                      </a>
-                      <p className="text-xs text-muted-foreground">{issue.CategoryIssues ?? "Uncategorized"}</p>
+                      <Link href={`/issues/${issue.id}`} className="text-sm font-medium hover:underline">
+                        {issue.title || "(Untitled)"}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">
+                        {issue.CategoryIssues || "Uncategorized"} · {formatDateTime(issue.created_at)}
+                      </p>
                     </div>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor[issue.Status ?? "open"] ?? ""}`}>
-                      {issue.Status ?? "open"}
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATE_LABEL[state]?.className ?? ""}`}>
+                      {STATE_LABEL[state]?.label ?? state}
                     </span>
                   </div>
                 ))}
@@ -111,8 +92,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* IBM Bob Hackathon Read-Only View */}
-        <DashboardClient />
+        <DashboardClient workspace={workspace} />
     </div>
   );
 }

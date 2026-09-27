@@ -5,7 +5,7 @@ import { signIn } from "@/app/auth/actions";
 import { Zap, User, Lock } from "lucide-react";
 
 interface LoginPageProps {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -70,6 +70,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </div>
 
             <form action={signIn} className="space-y-6">
+              {/* Page the visitor was sent here from; signIn only accepts same-site paths. */}
+              {params.next && <input type="hidden" name="next" value={params.next} />}
               <div className="space-y-2">
                 <Label htmlFor="namaUser" className="text-xs font-bold text-white drop-shadow-sm">
                   Username
