@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   ClipboardList,
   CheckCircle2,
@@ -16,6 +17,8 @@ import {
 } from "lucide-react";
 import { useWorkspace, issueStatus } from "@/components/layout/use-workspace";
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/utils";
+import { useSession } from "@/components/layout/use-session";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type IssueStatus = "RESOLVED" | "IN_PROGRESS" | "OPEN" | "PENDING_REVIEW";
@@ -150,6 +153,9 @@ function IssueDetail({ issue, onClose }: { issue: Issue; onClose: () => void }) 
             </span>
           </div>
           <h3 className="text-base font-bold text-slate-700 leading-snug">{issue.title}</h3>
+          <Link href={`/issues/${encodeURIComponent(issue.id)}`} className="inline-block mt-2 text-xs font-semibold text-[#449199] hover:underline">
+            View full details →
+          </Link>
         </div>
         <button
           onClick={onClose}
@@ -215,10 +221,14 @@ function IssueDetail({ issue, onClose }: { issue: Issue; onClose: () => void }) 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function IssuesPage() {
   const workspace = useWorkspace();
-  const MY_ISSUES: Issue[] = workspace.issues.map(issue => ({
+  const user = useSession();
+  const [scope, setScope] = useState<"mine" | "all">("mine");
+  // Signed-in reporters store their profile ID in reporter_id; "All" shows the whole team's reports.
+  const visibleIssues = scope === "mine" && user ? workspace.issues.filter(issue => issue.ReporterId === user.id) : workspace.issues;
+  const MY_ISSUES: Issue[] = visibleIssues.map(issue => ({
     id: issue.id, title: issue.title, projectId: issue.ProjekId,
     project: workspace.projects.find(project => project.id === issue.ProjekId)?.name || issue.ProjekId,
-    reporter: issue.ReporterId || "Team", urgency: (["critical", "high", "medium", "low"].includes(issue.severity || "") ? issue.severity!.toUpperCase() : "LOW") as IssueUrgency, reportedAt: issue.created_at,
+    reporter: issue.ReporterName || issue.ReporterId || "Team", urgency: (["critical", "high", "medium", "low"].includes(issue.severity || "") ? issue.severity!.toUpperCase() : "LOW") as IssueUrgency, reportedAt: formatDateTime(issue.created_at),
     status: issueStatus(workspace.jobs.find(job => job.issue_id === issue.id), issue.Status),
   }));
   const [filter,   setFilter]   = useState<IssueStatus | "ALL">("ALL");
@@ -262,15 +272,25 @@ export default function IssuesPage() {
             My Issues
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Track reports saved in Supabase (shared team demo; sign-in is not configured)
+            {scope === "mine" ? "Reports you submitted" : "All reports from your team"} · saved in Supabase
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className="border-[#5ec0ca]/40 text-[#449199] bg-[#5ec0ca]/5 text-xs font-semibold gap-1.5"
-        >
-          <User className="w-3.5 h-3.5" /> Rangga Pratama
-        </Badge>
+        <div className="flex items-center gap-3">
+          <div role="group" aria-label="Which reports" className="flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-semibold">
+            {(["mine", "all"] as const).map(option => (
+              <button key={option} type="button" aria-pressed={scope === option} onClick={() => { setScope(option); setSelected(null); }}
+                className={`px-3 py-1 rounded-md transition-colors ${scope === option ? "bg-[#5ec0ca] text-white" : "text-slate-500 hover:text-slate-700"}`}>
+                {option === "mine" ? "Mine" : "All team"}
+              </button>
+            ))}
+          </div>
+          <Badge
+            variant="outline"
+            className="border-[#5ec0ca]/40 text-[#449199] bg-[#5ec0ca]/5 text-xs font-semibold gap-1.5"
+          >
+            <User className="w-3.5 h-3.5" /> {user?.name ?? "…"}
+          </Badge>
+        </div>
       </div>
 
       {/* ── Summary KPI Cards ── */}
@@ -344,7 +364,9 @@ export default function IssuesPage() {
           {/* Issue rows */}
           {filtered.length === 0 ? (
             <div className="py-16 text-center text-sm text-slate-300">
-              No issues match your filter.
+              {scope === "mine" && MY_ISSUES.length === 0 ? (
+                <>You have not reported any issues yet. <Link href="/projects" className="text-[#449199] font-semibold hover:underline">Report one →</Link></>
+              ) : "No issues match your filter."}
             </div>
           ) : (
             <div className="divide-y divide-slate-50">

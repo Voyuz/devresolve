@@ -4,6 +4,7 @@ import { Home, FolderOpen, ClipboardList, Terminal, Bug, Cpu, Zap } from "lucide
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useBobStatus } from "@/components/layout/use-bob-status";
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -12,6 +13,10 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname();
+  // Real Bob Shell readiness on this server (checked via `bob run --help`, no task started).
+  const bob = useBobStatus();
+  const bobLabel = !bob ? "Checking..." : !bob.ready ? "Offline" : bob.running ? `Busy · ${bob.running} running` : "Ready";
+  const bobDot = !bob ? "bg-zinc-300" : !bob.ready ? "bg-red-400" : bob.running ? "bg-dev-cyan animate-pulse" : "bg-dev-mint";
   const isDevMode = pathname.startsWith("/developer");
 
   const menuItems = isDevMode
@@ -71,13 +76,13 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       <div className="p-4 mt-auto">
         <div className={cn("p-4 bg-dev-slate/5 rounded-2xl border border-dev-slate/10 transition-all", isCollapsed ? "flex justify-center" : "block")}>
           {isCollapsed ? (
-            <div className="w-2 h-2 rounded-full bg-dev-mint animate-pulse" />
+            <div title={bobLabel} className={cn("w-2 h-2 rounded-full", bobDot)} />
           ) : (
             <>
               <p className="text-badge text-dev-slate mb-1">IBM Bob Agent</p>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-dev-mint animate-pulse" />
-                <p className="text-code text-zinc-500 tracking-tighter uppercase font-bold">Local worker</p>
+              <div className="flex items-center gap-2" title={bob?.reason ?? undefined}>
+                <div className={cn("w-2 h-2 rounded-full shrink-0", bobDot)} />
+                <p className="text-code text-zinc-500 tracking-tighter uppercase font-bold">{bobLabel}</p>
               </div>
             </>
           )}

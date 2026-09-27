@@ -8,12 +8,15 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
-    "test:bob": "node --test tests/bob-request.test.mjs tests/bob-parser.test.mjs tests/bob-runner.test.mjs",
+    "test:bob": "node --test tests/bob-request.test.mjs tests/bob-parser.test.mjs tests/bob-runner.test.mjs tests/bob-prompt.test.mjs",
     "test:review": "node --test tests/bob-review.test.mjs",
-    "test:workspace": "node --test tests/workspace.test.mjs"
+    "test:workspace": "node --test tests/workspace.test.mjs",
+    "test:triage": "node --test tests/triage.test.mjs",
+    "test:auth": "node --test tests/auth.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

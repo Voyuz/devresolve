@@ -11,11 +11,12 @@ import {
   BarChart3,
   ShieldCheck,
 } from "lucide-react";
-import { useWorkspace, issueStatus } from "@/components/layout/use-workspace";
+import { useWorkspace } from "@/components/layout/use-workspace";
+import { projectMetrics } from "@/components/layout/workspace-metrics";
+import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 function HealthDot({ health }: { health: string }) {
-  if (health === "unknown") return <span className="text-xs text-slate-400">Not monitored</span>;
   if (health === "good") return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#2c7a6e]"><span className="w-2 h-2 rounded-full bg-[#80c8bc]" />Healthy</span>;
   if (health === "warning") return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#b87643]"><span className="w-2 h-2 rounded-full bg-[#ce8f5a]" />Warning</span>;
   return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500"><span className="w-2 h-2 rounded-full bg-red-400" />Critical</span>;
@@ -27,6 +28,7 @@ function ActivityDot({ type }: { type: string }) {
     assigned: "bg-[#5ec0ca]",
     accepted: "bg-[#6287a2]",
     pending: "bg-[#ce8f5a]",
+    failed: "bg-red-400",
     new: "bg-slate-400",
   };
   return <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${map[type] ?? "bg-slate-300"}`} />;
@@ -34,14 +36,25 @@ function ActivityDot({ type }: { type: string }) {
 
 export default function DevOverviewPage() {
   const workspace = useWorkspace();
+  // Health: critical/high open issues or a failed Bob run on an open issue need attention.
   const projectHealth = workspace.projects.map(project => {
-    const issues = workspace.issues.filter(issue => issue.ProjekId === project.id);
-    return { name: project.name, client: project.id, resolved: issues.filter(issue => issueStatus(workspace.jobs.find(job => job.issue_id === issue.id), issue.Status) === "RESOLVED").length,
-      openIssues: issues.filter(issue => issueStatus(workspace.jobs.find(job => job.issue_id === issue.id), issue.Status) === "OPEN").length,
-      inProgress: issues.filter(issue => issueStatus(workspace.jobs.find(job => job.issue_id === issue.id), issue.Status) === "IN_PROGRESS").length,
-      health: "unknown" };
+    const metrics = projectMetrics(project.id, workspace.issues, workspace.jobs);
+    return { name: project.name, client: project.id, resolved: metrics.resolved, openIssues: metrics.open,
+      inProgress: metrics.inProgress, health: metrics.health };
   });
-  const recentActivity = workspace.jobs.slice(0, 5).map(job => ({ time: new Date(job.created_at).toLocaleString(), event: "Issue #" + job.issue_id + ": " + (job.review_status || job.status), type: job.review_status === "APPROVED" ? "accepted" : "pending" }));
+  const describe = (status: string, review: string | null) =>
+    review === "APPROVED" ? ["fix approved and published", "accepted"]
+    : review === "CHANGES_REQUESTED" ? ["changes requested by reviewer", "assigned"]
+    : review === "REJECTED" ? ["fix rejected", "new"]
+    : status === "READY_FOR_REVIEW" ? [review ? "fix awaiting review" : "Bob finished (no saved patch)", "pending"]
+    : status === "FAILED" ? ["Bob run failed", "failed"]
+    : status === "NEEDS_HUMAN_INTERVENTION" ? ["Bob needs human input", "failed"]
+    : ["Bob is working", "assigned"];
+  const recentActivity = workspace.jobs.slice(0, 5).map(job => {
+    const [text, type] = describe(job.status, job.review_status);
+    const title = workspace.issues.find(issue => issue.id === job.issue_id)?.title;
+    return { time: formatDateTime(job.created_at), event: `Issue #${job.issue_id}${title ? ` (${title})` : ""}: ${text}`, type };
+  });
 const stats = [
   { label: "Total Open Issues", value: projectHealth.reduce((total, project) => total + project.openIssues, 0), icon: AlertTriangle, color: "text-[#ce8f5a]", border: "border-[#ce8f5a]/30", bg: "bg-[#ce8f5a]/5" },
   { label: "In Progress (Bob AI)", value: projectHealth.reduce((total, project) => total + project.inProgress, 0), icon: Cpu, color: "text-[#5ec0ca]", border: "border-[#5ec0ca]/30", bg: "bg-[#5ec0ca]/5" },

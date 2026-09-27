@@ -114,7 +114,7 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
+  --background: #fcfcfd;
   --foreground: #6287a2;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -149,14 +149,14 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --background: oklch(0.17 0.015 255);
+  --foreground: oklch(0.93 0.01 250);
+  --card: oklch(0.21 0.02 255);
+  --card-foreground: oklch(0.93 0.01 250);
+  --popover: oklch(0.21 0.02 255);
+  --popover-foreground: oklch(0.93 0.01 250);
+  --primary: #5ec0ca;
+  --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -166,13 +166,13 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: #5ec0ca;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: oklch(0.21 0.02 255);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -180,7 +180,100 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /*
+   * Pages use Tailwind palette utilities (bg-white, text-slate-700, bg-red-50, ...) rather than
+   * theme tokens. Tailwind v4 resolves those through --color-* variables, so dark mode remaps the
+   * palette here instead of adding dark: variants to every component. Neutral scales are inverted;
+   * accent tints become dark backgrounds with lighter text. Generated from Tailwind's default palette.
+   */
+  --color-white: var(--card);
+  --color-slate-50: oklch(24% 0.030 257.417);
+  --color-slate-100: oklch(27% 0.030 257.417);
+  --color-slate-200: oklch(32% 0.030 257.417);
+  --color-slate-300: oklch(40% 0.030 257.417);
+  --color-slate-400: oklch(58% 0.030 257.417);
+  --color-slate-500: oklch(64% 0.030 257.417);
+  --color-slate-600: oklch(74% 0.030 257.417);
+  --color-slate-700: oklch(84% 0.030 257.417);
+  --color-slate-800: oklch(90% 0.030 257.417);
+  --color-slate-900: oklch(95% 0.030 257.417);
+  --color-slate-950: oklch(98% 0.030 257.417);
+  --color-zinc-50: oklch(24% 0.016 285.938);
+  --color-zinc-100: oklch(27% 0.016 285.938);
+  --color-zinc-200: oklch(32% 0.016 285.938);
+  --color-zinc-300: oklch(40% 0.016 285.938);
+  --color-zinc-400: oklch(58% 0.016 285.938);
+  --color-zinc-500: oklch(64% 0.016 285.938);
+  --color-zinc-600: oklch(74% 0.016 285.938);
+  --color-zinc-700: oklch(84% 0.016 285.938);
+  --color-zinc-800: oklch(90% 0.016 285.938);
+  --color-zinc-900: oklch(95% 0.016 285.938);
+  --color-zinc-950: oklch(98% 0.016 285.938);
+  --color-gray-50: oklch(24% 0.027 264.364);
+  --color-gray-100: oklch(27% 0.027 264.364);
+  --color-gray-200: oklch(32% 0.027 264.364);
+  --color-gray-300: oklch(40% 0.027 264.364);
+  --color-gray-400: oklch(58% 0.027 264.364);
+  --color-gray-500: oklch(64% 0.027 264.364);
+  --color-gray-600: oklch(74% 0.027 264.364);
+  --color-gray-700: oklch(84% 0.027 264.364);
+  --color-gray-800: oklch(90% 0.027 264.364);
+  --color-gray-900: oklch(95% 0.027 264.364);
+  --color-gray-950: oklch(98% 0.027 264.364);
+  --color-red-50: oklch(26% 0.083 25.331);
+  --color-red-100: oklch(30% 0.107 25.331);
+  --color-red-200: oklch(38% 0.118 25.331);
+  --color-red-600: oklch(72% 0.213 25.331);
+  --color-red-700: oklch(78% 0.190 25.331);
+  --color-red-800: oklch(84% 0.142 25.331);
+  --color-amber-50: oklch(26% 0.066 70.08);
+  --color-amber-100: oklch(30% 0.085 70.08);
+  --color-amber-200: oklch(38% 0.094 70.08);
+  --color-amber-600: oklch(72% 0.169 70.08);
+  --color-amber-700: oklch(78% 0.150 70.08);
+  --color-amber-800: oklch(84% 0.113 70.08);
+  --color-yellow-50: oklch(26% 0.064 86.047);
+  --color-yellow-100: oklch(30% 0.083 86.047);
+  --color-yellow-200: oklch(38% 0.092 86.047);
+  --color-yellow-600: oklch(72% 0.166 86.047);
+  --color-yellow-700: oklch(78% 0.147 86.047);
+  --color-yellow-800: oklch(84% 0.110 86.047);
+  --color-orange-50: oklch(26% 0.075 47.604);
+  --color-orange-100: oklch(30% 0.096 47.604);
+  --color-orange-200: oklch(38% 0.106 47.604);
+  --color-orange-600: oklch(72% 0.192 47.604);
+  --color-orange-700: oklch(78% 0.170 47.604);
+  --color-orange-800: oklch(84% 0.128 47.604);
+  --color-green-50: oklch(26% 0.077 149.579);
+  --color-green-100: oklch(30% 0.099 149.579);
+  --color-green-200: oklch(38% 0.110 149.579);
+  --color-green-600: oklch(72% 0.197 149.579);
+  --color-green-700: oklch(78% 0.175 149.579);
+  --color-green-800: oklch(84% 0.131 149.579);
+  --color-emerald-50: oklch(26% 0.059 162.48);
+  --color-emerald-100: oklch(30% 0.077 162.48);
+  --color-emerald-200: oklch(38% 0.085 162.48);
+  --color-emerald-600: oklch(72% 0.153 162.48);
+  --color-emerald-700: oklch(78% 0.136 162.48);
+  --color-emerald-800: oklch(84% 0.102 162.48);
+  --color-blue-50: oklch(26% 0.075 259.815);
+  --color-blue-100: oklch(30% 0.096 259.815);
+  --color-blue-200: oklch(38% 0.107 259.815);
+  --color-blue-600: oklch(72% 0.193 259.815);
+  --color-blue-700: oklch(78% 0.171 259.815);
+  --color-blue-800: oklch(84% 0.128 259.815);
 }
+
+/* White text stays white on colored buttons even though --color-white now means "card surface". */
+.dark .text-white { color: oklch(1 0 0); }
+/* Darker brand text shades need more contrast on dark surfaces. */
+.dark .text-\[\#6287a2\] { color: #8fb0c8; }
+.dark .text-\[\#2c7a6e\] { color: #80c8bc; }
+.dark .text-\[\#449199\] { color: #7fd3db; }
+.dark .text-\[\#50728a\] { color: #9db8cc; }
+.dark .text-\[\#b56e36\], .dark .text-\[\#b87643\] { color: #e0a878; }
+.dark .text-\[\#b38f45\] { color: #e6c98a; }
 
 @layer base {
   * {

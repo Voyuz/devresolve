@@ -12,7 +12,8 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-import { useWorkspace, issueStatus } from "@/components/layout/use-workspace";
+import { useWorkspace } from "@/components/layout/use-workspace";
+import { projectMetrics, stateOf, URGENCY_LABEL } from "@/components/layout/workspace-metrics";
 import { Badge } from "@/components/ui/badge";
 
 function ProgressBar({ value, max }: { value: number; max: number }) {
@@ -31,10 +32,9 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
 export default function DashboardPage() {
   const workspace = useWorkspace();
   const PROJECTS_DATA = workspace.projects.map(project => {
-    const issues = workspace.issues.filter(issue => issue.ProjekId === project.id);
-    return { id: project.id, name: project.name, status: "REGISTERED", urgency: "LOW",
-      stats: { total: issues.length, critical: 0, resolved: issues.filter(issue => issueStatus(workspace.jobs.find(job => job.issue_id === issue.id), issue.Status) === "RESOLVED").length,
-        inProgress: issues.filter(issue => issueStatus(workspace.jobs.find(job => job.issue_id === issue.id), issue.Status) === "IN_PROGRESS").length } };
+    const metrics = projectMetrics(project.id, workspace.issues, workspace.jobs);
+    return { id: project.id, name: project.name, urgency: metrics.urgency,
+      stats: { total: metrics.total, critical: metrics.critical, resolved: metrics.resolved, inProgress: metrics.inProgress } };
   });
 const totals = PROJECTS_DATA.reduce(
   (acc, p) => ({
@@ -47,7 +47,7 @@ const totals = PROJECTS_DATA.reduce(
 );
 
 const resolvedPct = totals.total ? Math.round((totals.resolved / totals.total) * 100) : 0;
-const openIssues  = totals.total - totals.resolved;
+const openIssues  = workspace.issues.filter(issue => stateOf(issue, workspace.jobs) === "OPEN").length;
 
 // ─── Same stat config pattern as developer dashboard ─────────────────────────
 const stats = [
@@ -135,6 +135,8 @@ const stats = [
                 ? "bg-red-50 text-red-500 border border-red-100"
                 : project.urgency === "HIGH"
                 ? "bg-orange-50 text-orange-500 border border-orange-100"
+                : project.urgency === "MEDIUM"
+                ? "bg-yellow-50 text-yellow-700 border border-yellow-100"
                 : "bg-slate-50 text-slate-400 border border-slate-100";
 
             return (
@@ -145,7 +147,7 @@ const stats = [
                       {project.id}
                     </span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${urgencyStyle}`}>
-                      {project.urgency}
+                      {URGENCY_LABEL[project.urgency]}
                     </span>
                     <span className="text-sm font-semibold text-slate-700">{project.name}</span>
                   </div>

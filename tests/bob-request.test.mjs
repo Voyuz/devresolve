@@ -41,3 +41,12 @@ test("result redaction removes configured secrets before persistence or display"
   const result = redactSecrets({ reason: `Error: ${secret}`, activity: [{ message: secret }] }, [secret, undefined]);
   assert.deepEqual(result, { reason: "Error: [REDACTED]", activity: [{ message: "[REDACTED]" }] });
 });
+
+test("actual behavior and error log are validated and kept separate from the description", () => {
+  const input = validateSubmission({ projectId: "1", issue: { title: "t", description: "d", actualBehavior: " Crashes ", errorLog: "TypeError: x" } });
+  assert.equal(input.issue.description, "d");
+  assert.equal(input.issue.actualBehavior, "Crashes");
+  assert.equal(input.issue.errorLog, "TypeError: x");
+  assert.throws(() => validateSubmission({ projectId: "1", issue: { title: "t", description: "d", errorLog: "x".repeat(20001) } }));
+  assert.throws(() => validateSubmission({ projectId: "1", issue: { title: "t", description: "d", actualBehavior: 42 } }));
+});

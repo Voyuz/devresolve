@@ -7,7 +7,7 @@ export default function MainDashboardLayout({ children }: { children: React.Reac
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   return (
-    <div className="flex min-h-screen bg-[#fcfcfd]">
+    <div className="flex min-h-screen bg-background">
       {/* Sidebar - Always Present */}
       <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
 

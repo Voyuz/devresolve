@@ -15,7 +15,7 @@ const jetbrains = JetBrains_Mono({
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrains.variable}`}>
-      <body className="antialiased bg-[#fcfcfd]">
+      <body className="antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>{children}</ThemeProvider>
       </body>
     </html>
