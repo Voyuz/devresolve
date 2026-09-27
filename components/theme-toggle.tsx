@@ -1,17 +1,41 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 
+const OPTIONS = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+] as const;
+
+// The stored theme is only known in the browser; render no selection on the server to avoid a hydration mismatch.
+const subscribe = () => () => {};
+const useMounted = () => useSyncExternalStore(subscribe, () => true, () => false);
+
 export function ThemeToggle() {
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const mounted = useMounted();
 
   return (
     <div role="group" aria-label="Color theme" className="flex gap-2">
-      <Button variant="outline" size="sm" onClick={() => setTheme("light")}><Sun /> Light</Button>
-      <Button variant="outline" size="sm" onClick={() => setTheme("dark")}><Moon /> Dark</Button>
-      <Button variant="outline" size="sm" onClick={() => setTheme("system")}><Monitor /> System</Button>
+      {OPTIONS.map(({ value, label, icon: Icon }) => {
+        const active = mounted && theme === value;
+        return (
+          <Button
+            key={value}
+            variant="outline"
+            size="sm"
+            aria-pressed={active}
+            onClick={() => setTheme(value)}
+            className={active ? "border-[#5ec0ca] text-[#449199] bg-[#5ec0ca]/10" : undefined}
+          >
+            <Icon /> {label}
+          </Button>
+        );
+      })}
     </div>
   );
 }

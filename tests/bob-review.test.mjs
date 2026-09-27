@@ -107,6 +107,7 @@ test('review requires same origin and reviewer code; reject and concurrent claim
     '@/lib/supabase/bob-store':{getReviewJob:async()=>job,getJob:async()=>job,claimReview:async()=>{if(claimed)return false;claimed=true;return true;},updateJob:async()=>{}},
     '@/lib/github/publish':{publishArtifact:async()=>{published++;return{commitUrl:'fixture'};}},
     'node:crypto':await import('node:crypto'),
+    '@/lib/auth/session':{requireRole:()=>null},
   };
   const exports={};
   vm.runInNewContext(ts.transpileModule(await readFile('app/api/bob/jobs/[id]/review/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
@@ -123,4 +124,34 @@ test('review requires same origin and reviewer code; reject and concurrent claim
   claimed=false;
   assert.equal((await exports.POST(request('approve'),context)).status,200);
   assert.equal(published,1);
+});
+
+test('request changes requires feedback, stores it, and never publishes',async()=>{
+  let published=0,claimed=null,saved=null;
+  const job={id:'037ae2c5-26b6-4f13-a4d6-6a396bc33be7',status:'READY_FOR_REVIEW',review_status:'PENDING',artifact:options.artifact,result:{review:{branch:options.branch,patch:'p'}},repo_url:options.repoUrl,base_branch:'main'};
+  const modules={
+    '@/lib/supabase/bob-store':{getReviewJob:async()=>job,getJob:async()=>job,
+      claimReview:async(_id,decision)=>{claimed=decision;return true;},
+      saveReviewFeedback:async(_id,_result,feedback)=>{saved=feedback;},updateJob:async()=>{}},
+    '@/lib/github/publish':{publishArtifact:async()=>{published++;return{commitUrl:'fixture'};}},
+    'node:crypto':await import('node:crypto'),
+    '@/lib/auth/session':{requireRole:()=>null},
+  };
+  const exports={};
+  vm.runInNewContext(ts.transpileModule(await readFile('app/api/bob/jobs/[id]/review/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
+    {exports,require:n=>modules[n],Response,URL,Buffer,Error,process:{env:{DEVRESOLVE_REVIEW_TOKEN:'review-fixture',GITHUB_TOKEN:'fixture'}}});
+  const request=body=>new Request('http://localhost/api/review',{method:'POST',headers:{origin:'http://localhost','content-type':'application/json','x-review-token':'review-fixture'},body:JSON.stringify(body)});
+  const context={params:Promise.resolve({id:job.id})};
+  assert.equal((await exports.POST(request({decision:'request_changes'}),context)).status,400);
+  assert.equal((await exports.POST(request({decision:'request_changes',feedback:'   '}),context)).status,400);
+  assert.equal((await exports.POST(request({decision:'request_changes',feedback:'x'.repeat(2001)}),context)).status,400);
+  assert.equal(claimed,null);
+  assert.equal((await exports.POST(request({decision:'request_changes',feedback:'  Also trim whitespace.  '}),context)).status,200);
+  assert.equal(claimed,'request_changes');
+  assert.equal(saved,'Also trim whitespace.');
+  assert.equal(published,0);
+  job.review_status='CHANGES_REQUESTED';claimed=null;
+  assert.equal((await exports.POST(request({decision:'approve'}),context)).status,200);
+  assert.equal(claimed,null,'a review with requested changes cannot be approved afterwards');
+  assert.equal(published,0);
 });

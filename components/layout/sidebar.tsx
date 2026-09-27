@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Home, FolderOpen, ClipboardList, Terminal, Bug, Cpu, Zap, UserPlus } from "lucide-react";
+import { Home, FolderOpen, ClipboardList, Bug, Cpu, Zap, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";

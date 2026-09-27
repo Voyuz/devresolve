@@ -59,6 +59,8 @@ id_dsa
 *credentials*
 *secret*
 *password*
+# UI component, not a credential file (the broad rule above would hide it).
+!components/ui/password-input.tsx
 *token*
 
 # Database credentials

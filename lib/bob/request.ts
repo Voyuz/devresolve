@@ -22,10 +22,15 @@ export function validateSubmission(value: unknown): { projectId: string; issue: 
     }
     return value.trim() || undefined;
   }
+  const actualBehavior = text("actualBehavior", 10000);
+  const errorLog = text("errorLog", 20000);
   return { projectId, issue: {
     title: text("title", 250, true)!,
     description: text("description", 20000, true)!,
     expectedBehavior: text("expectedBehavior", 10000),
     screenshotRef: text("screenshotRef", 2000),
+    // Optional report fields are omitted when absent, keeping older request shapes unchanged.
+    ...(actualBehavior ? { actualBehavior } : {}),
+    ...(errorLog ? { errorLog } : {}),
   } };
 }

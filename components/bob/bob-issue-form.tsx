@@ -1,22 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { BobResolveResult, BobActivityEvent, BobProject, BobStoredJob } from "@/types/bob";
-
-// ---------------------------------------------------------------------------
-// Status badge colours
-// ---------------------------------------------------------------------------
-const STATUS_COLOR: Record<string, string> = {
-  QUEUED: "bg-gray-100 text-gray-700",
-  CLONING: "bg-blue-100 text-blue-700",
-  INVESTIGATING: "bg-yellow-100 text-yellow-700",
-  FIXING: "bg-orange-100 text-orange-700",
-  VALIDATING: "bg-purple-100 text-purple-700",
-  READY_FOR_REVIEW: "bg-green-100 text-green-700",
-  NEEDS_HUMAN_INTERVENTION: "bg-amber-100 text-amber-800",
-  FAILED: "bg-red-100 text-red-700",
-};
+import { formatDateTime } from "@/lib/utils";
+import { explainReason, roundState, TONE_CLASS } from "@/components/bob/round-status";
 
 const KIND_ICON: Record<string, string> = {
   repository_loaded: "📂",
@@ -30,7 +18,25 @@ const KIND_ICON: Record<string, string> = {
   info: "ℹ️",
 };
 
-export default function BobIssueForm({ basePath = "/issues/new", heading = "Report an issue", issueId, jobId: requestedJobId, reviewOnly = false }: { basePath?: string; heading?: string; issueId?: string; jobId?: string; reviewOnly?: boolean }) {
+// Saved results may be partial (legacy or manually edited rows); fill required fields from the job.
+function resultFromJob(job: BobStoredJob): BobResolveResult | null {
+  if (!job.result) return null;
+  const stored = job.result as Partial<BobResolveResult>;
+  return { ...stored, jobId: stored.jobId ?? job.id, issueId: stored.issueId ?? job.issue_id,
+    status: stored.status ?? job.status, changedFiles: stored.changedFiles ?? [], activity: stored.activity ?? [] };
+}
+
+// Bob's self-correction inside one run: how often it validated, and how often validation failed.
+function validationStats(activity: BobActivityEvent[]) {
+  const count = (predicate: (event: BobActivityEvent) => boolean) => activity.filter(predicate).length;
+  return {
+    testRuns: count(event => event.kind === "running_command" && event.message === "Running tests"),
+    buildRuns: count(event => event.kind === "running_command" && event.message === "Running build"),
+    failures: count(event => (event.kind === "test_result" || event.kind === "build_result") && event.success === false),
+  };
+}
+
+export default function BobIssueForm({ basePath = "/issues/new", heading = "Report an issue", issueId, jobId: requestedJobId, previousJobId, reviewOnly = false }: { basePath?: string; heading?: string; issueId?: string; jobId?: string; previousJobId?: string; reviewOnly?: boolean }) {
   const [projects, setProjects] = useState<BobProject[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectId, setProjectId] = useState("");
@@ -47,20 +53,29 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewToken, setReviewToken] = useState("");
+  const [feedback, setFeedback] = useState("");
+  // undefined = loading, null = the previous job has no saved feedback
+  const [previousFeedback, setPreviousFeedback] = useState<string | null | undefined>(undefined);
+  const sectionRef = useRef<HTMLElement>(null);
 
-  async function reviewFix(decision: "approve" | "reject") {
+  // Opening a job or issue from a list above: bring this panel into view.
+  useEffect(() => {
+    if (requestedJobId || issueId) sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [requestedJobId, issueId]);
+
+  async function reviewFix(decision: "approve" | "reject" | "request_changes") {
     if (!result?.jobId || reviewLoading) return;
     setReviewLoading(true);
     setRequestError(null);
     try {
       const response = await fetch(`/api/bob/jobs/${encodeURIComponent(result.jobId)}/review`, {
         method: "POST", headers: { "Content-Type": "application/json", "X-Review-Token": reviewToken.trim() },
-        body: JSON.stringify({ decision }),
+        body: JSON.stringify(decision === "request_changes" ? { decision, feedback: feedback.trim() } : { decision }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Review failed.");
       setSavedJob(data.job);
-      setResult(data.job.result);
+      setResult(resultFromJob(data.job));
     } catch (error) {
       setRequestError(error instanceof Error ? error.message : "Review failed.");
     } finally { setReviewLoading(false); }
@@ -98,15 +113,24 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Cannot load saved job.");
         setSavedJob(data.job);
-        setResult(data.job.result);
+        setResult(resultFromJob(data.job));
       } catch (error) {
         if (!controller.signal.aborted) setRequestError(error instanceof Error ? error.message : "Cannot load saved job.");
       }
     }
+    async function loadPreviousFeedback() {
+      if (!previousJobId) return;
+      try {
+        const response = await fetch(`/api/bob/jobs/${encodeURIComponent(previousJobId)}`, { cache: "no-store", signal: controller.signal });
+        const data = await response.json();
+        setPreviousFeedback(response.ok ? data.job?.result?.review?.feedback ?? null : null);
+      } catch { if (!controller.signal.aborted) setPreviousFeedback(null); }
+    }
     void loadProjects();
     void restoreJob();
+    void loadPreviousFeedback();
     return () => controller.abort();
-  }, [requestedJobId]);
+  }, [requestedJobId, previousJobId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -120,7 +144,7 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
     if (!issueId) window.history.replaceState(null, "", basePath);
 
     try {
-      const body = issueId ? { issueId } : {
+      const body = issueId ? { issueId, ...(previousJobId ? { previousJobId } : {}) } : {
         projectId: selectedProject!.id,
         issue: {
           title,
@@ -180,11 +204,12 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
   }
 
   return (
-    <section className="mx-auto max-w-3xl space-y-6 rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
+    <section ref={sectionRef} className="mx-auto max-w-3xl scroll-mt-24 space-y-6 rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold">{heading}</h1>
         <p className="text-sm text-muted-foreground">
-          {issueId ? `Investigate saved issue #${issueId}.` : reviewOnly ? "Review the saved Bob result and publish the approved fix to GitHub." : "Submit a bug report and watch IBM Bob Shell investigate and fix it."}
+          {issueId && previousJobId ? `Run Bob again on issue #${issueId} with the reviewer's requested changes.`
+            : issueId ? `Investigate saved issue #${issueId}.` : reviewOnly ? "Review the saved Bob result and publish the approved fix to GitHub." : "Submit a bug report and watch IBM Bob Shell investigate and fix it."}
         </p>
         <Link href="/dashboard" className="text-sm underline underline-offset-4">
           ← Back to Dashboard
@@ -198,6 +223,13 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
       )}
       {savedJob && !result && (
         <p className="text-sm">Saved job: {savedJob.status}. Refresh to check for a completed result.</p>
+      )}
+      {previousJobId && !result && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+          <p className="font-semibold text-amber-800">Reviewer requested changes</p>
+          <p className="mt-1 whitespace-pre-wrap text-amber-700">{previousFeedback === undefined ? "Loading feedback..." : previousFeedback ?? "No requested changes were found for the previous job; submitting will be rejected."}</p>
+          <p className="mt-2 text-xs text-amber-700/80">Bob receives this feedback and the previous patch, then produces a new fix for review.</p>
+        </div>
       )}
 
       {/* ------------------------------------------------------------------ */}
@@ -331,28 +363,90 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
       {/* ------------------------------------------------------------------ */}
       {result && !loading && (
         <div className="space-y-6">
-          {/* Status header */}
-          <div className="flex items-center gap-3">
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLOR[result.status] ?? "bg-gray-100 text-gray-700"}`}
-            >
-              {result.status}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              Issue: {result.issueId}
-            </span>
-            {result.bobTaskId && (
-              <span className="text-xs text-muted-foreground">
-                Bob task: {result.bobTaskId}
-              </span>
-            )}
-          </div>
+          {/* Status card: what happened, what it means, and what to do next */}
+          {(() => {
+            const rounds = savedJob?.history ?? [];
+            const index = rounds.findIndex(round => round.id === result.jobId);
+            const approved = rounds.find(round => round.review_status === "APPROVED");
+            const latest = rounds.at(-1);
+            const supersededBy = approved && approved.id !== result.jobId ? approved : undefined;
+            const newer = !supersededBy && latest && index >= 0 && latest.id !== result.jobId ? latest : undefined;
+            const state = roundState(result.status, result.review?.status ?? rounds[index]?.review_status ?? null);
+            const roundNumber = (job: { id: string }) => rounds.findIndex(round => round.id === job.id) + 1;
+            const title = supersededBy ? "Earlier attempt · issue already resolved" : newer ? "Earlier attempt · a newer round exists" : state.label;
+            const tone = supersededBy ? TONE_CLASS.success : newer ? TONE_CLASS.muted : TONE_CLASS[state.tone];
+            const meaning = supersededBy
+              ? `This round ended as "${state.label}", but round ${roundNumber(supersededBy)} fixed the issue and was approved and published to GitHub.`
+              : newer ? `This is round ${index + 1}. Bob already ran again: round ${roundNumber(newer)} is "${roundState(newer.status, newer.review_status).label}".`
+              : state.meaning;
+            const next = supersededBy ? "Nothing to do here. Open the approved round to see the published fix."
+              : newer ? "Open the latest round to continue." : state.next;
+            const target = supersededBy ?? newer;
+            return (
+              <div className={`rounded-xl border p-4 space-y-2 ${tone}`}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-base font-bold">{title}</p>
+                  <span className="text-xs opacity-80">
+                    Issue #{result.issueId}{index >= 0 && ` · round ${index + 1} of ${rounds.length}`}
+                  </span>
+                </div>
+                <p className="text-sm">{meaning}</p>
+                <p className="text-sm"><span className="font-semibold">Next: </span>{next}</p>
+                {!target && state.key === "published" && result.review?.commitUrl && (
+                  <a href={result.review.commitUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-semibold underline">
+                    View the published commit on GitHub →
+                  </a>
+                )}
+                {target && reviewOnly && (
+                  <Link href={`${basePath}?job=${encodeURIComponent(target.id)}`} className="inline-block text-sm font-semibold underline">
+                    Open round {roundNumber(target)} →
+                  </Link>
+                )}
+                {result.bobTaskId && <p className="text-[11px] opacity-70">Bob task ID: {result.bobTaskId}</p>}
+              </div>
+            );
+          })()}
+
+          {/* Iterations: review rounds for this issue and self-correction inside this run */}
+          {(() => {
+            const rounds = savedJob?.history ?? [];
+            const current = rounds.findIndex(round => round.id === result.jobId);
+            const stats = validationStats(result.activity);
+            if (!rounds.length && !stats.testRuns && !stats.buildRuns) return null;
+            return (
+              <Section title="Iterations">
+                {current >= 0 && <p className="text-sm font-medium">Review round {current + 1} of {rounds.length} for issue #{result.issueId}</p>}
+                {(stats.testRuns > 0 || stats.buildRuns > 0) && (
+                  <p className="text-xs text-muted-foreground">
+                    In this run Bob ran tests {stats.testRuns}× and the build {stats.buildRuns}×
+                    {stats.failures > 0 ? `; ${stats.failures} validation run(s) failed and Bob kept iterating.` : "."}
+                  </p>
+                )}
+                {rounds.length > 1 && (
+                  <ol className="mt-2 space-y-1.5">
+                    {rounds.map((round, index) => (
+                      <li key={round.id} className="text-xs">
+                        <span className={round.id === result.jobId ? "font-semibold" : ""}>
+                          Round {index + 1}: {roundState(round.status, round.review_status).label}
+                        </span>
+                        <span className="text-muted-foreground"> · {formatDateTime(round.created_at)}</span>
+                        {round.id !== result.jobId && reviewOnly && (
+                          <> · <Link href={`${basePath}?job=${encodeURIComponent(round.id)}`} className="underline">open</Link></>
+                        )}
+                        {round.feedback && <p className="mt-0.5 pl-3 italic text-muted-foreground">&ldquo;{round.feedback}&rdquo;</p>}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </Section>
+            );
+          })()}
 
           {/* Root cause */}
           {result.review && (
             <Section title="Human review">
               <p className="text-sm">Review status: {result.review.status}</p>
-              <p className="mt-2 text-xs text-muted-foreground">Approve saves this fix as a commit on GitHub branch {result.review.branch}. Reject leaves GitHub unchanged.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Approve saves this fix as a commit on GitHub branch {result.review.branch}. Request changes sends your feedback back to Bob for another round. Reject leaves GitHub unchanged.</p>
               <details className="mt-3" open>
                 <summary className="cursor-pointer text-sm font-medium">Review code changes</summary>
                 <pre className="mt-2 max-h-96 overflow-auto whitespace-pre text-xs">{result.review.patch}</pre>
@@ -373,12 +467,40 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
                       className="rounded-md border px-4 py-2 text-sm disabled:opacity-50">Reject</button>
                   </div>
                   {result.review.status === "PUBLISH_FAILED" && <p className="text-xs text-muted-foreground">Retry approval to reconcile the GitHub branch before making another decision.</p>}
+                  {result.review.status === "PENDING" && (
+                    <div className="space-y-2 border-t pt-3">
+                      <label className="block text-sm">What should Bob change?
+                        <textarea value={feedback} onChange={event => setFeedback(event.target.value)} maxLength={2000} rows={3}
+                          placeholder="e.g. Also trim whitespace from the email and add a test for it."
+                          className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm" disabled={reviewLoading} />
+                      </label>
+                      <button type="button" disabled={reviewLoading || !reviewToken || !feedback.trim()} onClick={() => void reviewFix("request_changes")}
+                        className="rounded-md border border-amber-300 px-4 py-2 text-sm text-amber-800 disabled:opacity-50">Request changes</button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {result.review.status === "CHANGES_REQUESTED" && (
+                <div className="mt-4 space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-semibold text-amber-800">Changes requested</p>
+                  {result.review.feedback && <p className="whitespace-pre-wrap text-sm text-amber-700">{result.review.feedback}</p>}
+                  {reviewOnly && result.jobId && result.jobId === savedJob?.history?.at(-1)?.id && (
+                    <Link href={`${basePath}?issue=${encodeURIComponent(result.issueId)}&previousJob=${encodeURIComponent(result.jobId)}`}
+                      className="inline-block rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">
+                      Run Bob with this feedback
+                    </Link>
+                  )}
                 </div>
               )}
             </Section>
           )}
-          {result.status === "READY_FOR_REVIEW" && !result.review && (
-            <p className="text-sm text-muted-foreground">This older job has no saved code artifact. Run Bob again to review and publish the fix.</p>
+          {reviewOnly && result.issueId && !result.review && result.jobId === savedJob?.history?.at(-1)?.id &&
+            !savedJob?.history?.some(round => round.review_status === "APPROVED") &&
+            ["READY_FOR_REVIEW", "FAILED", "NEEDS_HUMAN_INTERVENTION"].includes(result.status) && (
+            <Link href={`${basePath}?issue=${encodeURIComponent(result.issueId)}`}
+              className="inline-block rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">
+              Run Bob again for issue #{result.issueId}
+            </Link>
           )}
           {result.rootCause && (
             <Section title="Root cause">
@@ -390,10 +512,11 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
           {result.reason && (
             <Section title={result.status === "NEEDS_HUMAN_INTERVENTION" ? "Why human intervention is needed" : "Reason"}>
               <p className="text-sm">{result.reason}</p>
+              {explainReason(result.reason) && <p className="mt-2 text-xs text-muted-foreground">In plain words: {explainReason(result.reason)}</p>}
               {result.status === "NEEDS_HUMAN_INTERVENTION" && (
-                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs dark:border-amber-800/50 dark:bg-amber-900/20">
-                  <p className="font-semibold text-amber-800 dark:text-amber-300">Continue in IBM Bob IDE</p>
-                  <p className="mt-1 text-amber-700 dark:text-amber-400">
+                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs">
+                  <p className="font-semibold text-amber-800">Continue in IBM Bob IDE</p>
+                  <p className="mt-1 text-amber-700">
                     Repository: <code>{result.repoUrl}</code>
                     <br />
                     Branch: <code>{result.branch}</code>

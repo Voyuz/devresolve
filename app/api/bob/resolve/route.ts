@@ -1,4 +1,4 @@
-﻿import { createWorkspace, validateRepoUrl } from "@/lib/bob/workspace";
+﻿import { createWorkspace, installDependencies, validateRepoUrl } from "@/lib/bob/workspace";
 import { buildBobPrompt } from "@/lib/bob/prompt-builder";
 import { checkBobAvailability, runBob } from "@/lib/bob/runner";
 import { BobStreamParser } from "@/lib/bob/parser";
@@ -6,14 +6,19 @@ import { databaseId, validateSubmission } from "@/lib/bob/request";
 import { createExistingIssueJob, getIssue } from "@/lib/supabase/issues";
 import { redactSecrets } from "@/lib/bob/redact";
 import { captureArtifact, workspaceHead } from "@/lib/bob/artifact";
-import { createJob, ensureReviewSchema, getProject, saveResult, saveReviewArtifact, updateJob } from "@/lib/supabase/bob-store";
+import { createJob, ensureReviewSchema, getProject, getReviewJob, saveResult, saveReviewArtifact, updateJob } from "@/lib/supabase/bob-store";
 import type { BobProject, BobResolveResult } from "@/types/bob";
+import { requireRole, sessionFromRequest } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const denied = requireRole(request, "developer");
+  if (denied) return denied;
+  const reporterId = sessionFromRequest(request)?.id;
   let submission: ReturnType<typeof validateSubmission>;
   let existingIssueId: string | null = null;
+  let revision: { previousJobId: string; feedback: string; previousPatch: string } | undefined;
   try {
     const body = await request.json();
     if (body.issueId !== undefined) {
@@ -22,6 +27,16 @@ export async function POST(request: Request) {
       const saved = await getIssue(existingIssueId);
       if (!saved) return Response.json({ error: "Issue not found." }, { status: 404 });
       submission = validateSubmission(saved);
+      // Follow-up round: address the reviewer's requested changes on an earlier job for this issue.
+      if (body.previousJobId !== undefined) {
+        if (typeof body.previousJobId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.previousJobId)) throw new Error("Invalid previous job ID.");
+        const previous = await getReviewJob(body.previousJobId);
+        const feedback = previous.result?.review?.feedback;
+        if (previous.issue_id !== existingIssueId || previous.review_status !== "CHANGES_REQUESTED" || !feedback) {
+          throw new Error("The previous job has no requested changes for this issue.");
+        }
+        revision = { previousJobId: previous.id, feedback, previousPatch: previous.artifact?.patch || previous.result?.review?.patch || "" };
+      }
     } else submission = validateSubmission(body);
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Invalid request." }, { status: 400 });
@@ -35,7 +50,7 @@ export async function POST(request: Request) {
     project = selectedProject;
     validateRepoUrl(project.repoUrl);
     await ensureReviewSchema();
-    job = existingIssueId ? await createExistingIssueJob(project, existingIssueId) : await createJob(project, submission.issue);
+    job = existingIssueId ? await createExistingIssueJob(project, existingIssueId) : await createJob(project, submission.issue, reporterId);
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Cannot create job." }, { status: 503 });
   }
@@ -49,7 +64,8 @@ export async function POST(request: Request) {
     let result: BobResolveResult;
     let cleanupFailed = false;
     const activity: BobResolveResult["activity"] = [{ kind: "info", message: "Project resolved from Supabase", timestamp: new Date().toISOString() }];
-    send({ type: "activity", event: activity[0] });
+    if (revision) activity.push({ kind: "info", message: "Addressing reviewer feedback from the previous round", timestamp: new Date().toISOString() });
+    for (const event of activity) send({ type: "activity", event });
     const parser = new BobStreamParser();
     try {
       const launch = await checkBobAvailability();
@@ -61,9 +77,13 @@ export async function POST(request: Request) {
       const baseSha = await workspaceHead(workspace.workspacePath);
       activity.push({ kind: "repository_loaded", message: "Repository cloned and fix branch created", timestamp: new Date().toISOString() });
       send({ type: "activity", event: activity.at(-1) });
+      send({ type: "activity", event: { kind: "running_command", message: "Installing project dependencies", timestamp: new Date().toISOString() } });
+      const installed = await installDependencies(workspace.workspacePath);
+      activity.push({ kind: "info", message: installed ? "Dependencies installed" : "Dependencies not pre-installed; Bob will install them if needed", timestamp: new Date().toISOString() });
+      send({ type: "activity", event: activity.at(-1) });
       await updateJob(job.jobId, { status: "INVESTIGATING", fix_branch: branch });
       const run = await runBob({ workspacePath: workspace.workspacePath, launch,
-        prompt: buildBobPrompt({ issueId: job.issueId, project, issue: submission.issue, fixBranch: branch }),
+        prompt: buildBobPrompt({ issueId: job.issueId, project, issue: submission.issue, fixBranch: branch, revision }),
         onLine(line) {
           const previousCount = parser.activity.length;
           parser.consume(line);
@@ -71,7 +91,7 @@ export async function POST(request: Request) {
         } });
       const parsed = parser.finish(run.exitCode);
       result = { ...parsed, activity: [...activity, ...parsed.activity], jobId: job.jobId, issueId: job.issueId,
-        repoUrl: project.repoUrl, branch, bobTaskId: run.bobTaskId };
+        repoUrl: project.repoUrl, branch, bobTaskId: run.bobTaskId, previousJobId: revision?.previousJobId };
       if (result.status === "READY_FOR_REVIEW") {
         const artifact = await captureArtifact(workspace.workspacePath, baseSha, secretValues);
         if (artifact) {
@@ -81,13 +101,14 @@ export async function POST(request: Request) {
           await saveReviewArtifact(job.jobId, artifact);
         } else {
           result.status = "FAILED";
-          result.reason = "Bob reported a fix, but no code changes were found to review.";
+          result.reason = `Bob finished and validation passed, but made no code changes. The bug may already be fixed on the "${project.defaultBranch}" branch — check the root cause below, then close the issue or point the project at a branch that still has the bug.`;
         }
       }
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Bob execution failed.";
       result = { status: "FAILED", jobId: job.jobId, issueId: job.issueId, repoUrl: project.repoUrl,
-        branch, reason, changedFiles: [], activity: [...activity, ...parser.activity, { kind: "error", message: reason, timestamp: new Date().toISOString() }] };
+        branch, reason, changedFiles: [], previousJobId: revision?.previousJobId,
+        activity: [...activity, ...parser.activity, { kind: "error", message: reason, timestamp: new Date().toISOString() }] };
     } finally {
       try { await cleanup?.(); } catch {
         cleanupFailed = true;

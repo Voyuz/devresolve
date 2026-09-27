@@ -10,8 +10,10 @@ import {
   Cpu,
   User,
   Flag,
-  Inbox,
   ChevronDown,
+  Sparkles,
+  Loader2,
+  Wand2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/components/layout/use-workspace";
@@ -25,9 +27,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { formatDateTime } from "@/lib/utils";
+import { PRIORITY_LEVELS, SEVERITY_LEVELS, type PriorityLevel, type SeverityLevel, type TriageResult } from "@/types/issues";
 
 // --- TYPES ---
-type Urgency = "HIGH" | "MEDIUM" | "LOW";
 type AssignTarget = "bob" | "human" | null;
 
 interface RawIssue {
@@ -35,7 +38,11 @@ interface RawIssue {
   client: string;
   title: string;
   description: string;
-  urgency: Urgency;
+  expected: string | null;
+  actual: string | null;
+  errorLog: string | null;
+  severity: SeverityLevel | null;
+  priority: PriorityLevel | null;
   module: string;
   repo: string;
   reportedAt: string;
@@ -43,26 +50,51 @@ interface RawIssue {
   assignedTo: AssignTarget;
 }
 
+const SEVERITY_STYLE: Record<SeverityLevel, string> = {
+  critical: "bg-red-50 text-red-600 border border-red-200",
+  high: "bg-[#ce8f5a]/15 text-[#b56e36] border border-[#ce8f5a]/40",
+  medium: "bg-[#efd199]/20 text-[#b38f45] border border-[#efd199]/50",
+  low: "bg-[#6287a2]/10 text-[#50728a] border border-[#6287a2]/30",
+};
+const PRIORITY_LABEL: Record<PriorityLevel, string> = { urgent: "P0 Urgent", high: "P1 High", medium: "P2 Medium", low: "P3 Low" };
+const rank = <T extends string>(levels: readonly T[], value: T | null) => (value ? levels.indexOf(value) : -1);
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
-
-
-function UrgencyBadge({ urgency }: { urgency: Urgency }) {
-  if (urgency === "HIGH")
+function SeverityBadge({ severity }: { severity: SeverityLevel | null }) {
+  if (!severity)
     return (
-      <Badge className="bg-[#ce8f5a]/15 text-[#b56e36] border border-[#ce8f5a]/40 shadow-none font-semibold text-xs">
-        Critical
+      <Badge className="bg-slate-50 text-slate-400 border border-slate-200 shadow-none font-semibold text-xs">
+        Untriaged
       </Badge>
     );
-  if (urgency === "MEDIUM")
-    return (
-      <Badge className="bg-[#efd199]/20 text-[#b38f45] border border-[#efd199]/50 shadow-none font-semibold text-xs">
-        High (P1)
-      </Badge>
-    );
+  return <Badge className={`${SEVERITY_STYLE[severity]} shadow-none font-semibold text-xs`}>{capitalize(severity)}</Badge>;
+}
+
+function PriorityBadge({ priority }: { priority: PriorityLevel | null }) {
+  if (!priority) return null;
   return (
-    <Badge className="bg-[#6287a2]/10 text-[#50728a] border border-[#6287a2]/30 shadow-none font-semibold text-xs">
-      Normal
+    <Badge variant="outline" className="border-slate-200 text-slate-500 shadow-none font-semibold text-xs">
+      {PRIORITY_LABEL[priority]}
     </Badge>
+  );
+}
+
+function TriageNote({ result }: { result: TriageResult }) {
+  return (
+    <div className="mt-2 flex items-start gap-1.5 text-xs">
+      {result.source === "bob" ? (
+        <Sparkles className="w-3.5 h-3.5 text-[#5ec0ca] shrink-0 mt-0.5" />
+      ) : (
+        <Wand2 className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+      )}
+      <p className="text-slate-500 leading-relaxed">
+        <span className="font-semibold text-slate-600">
+          {result.source === "bob" ? "Triaged by IBM Bob" : "Triaged by keyword rules"}
+        </span>
+        {result.fallbackReason && <span className="text-[#b56e36]"> (Bob unavailable: {result.fallbackReason})</span>}
+        {result.rationale && <> — {result.rationale}</>}
+      </p>
+    </div>
   );
 }
 
@@ -71,16 +103,23 @@ export default function IssueTriagePage() {
   const router = useRouter();
   const issues: RawIssue[] = workspace.issues.map(issue => ({
     id: issue.id, title: issue.title, description: issue.description,
+    expected: issue.expected_behavior, actual: issue.actual_behavior ?? null, errorLog: issue.error_log ?? null,
     client: workspace.projects.find(project => project.id === issue.ProjekId)?.name || issue.ProjekId,
     repo: workspace.projects.find(project => project.id === issue.ProjekId)?.repoUrl || "",
-    urgency: "LOW", module: issue.CategoryIssues, reportedAt: issue.created_at,
-    reportedBy: issue.ReporterId || "Team",
+    severity: (issue.severity as SeverityLevel | null) ?? null, priority: (issue.priority as PriorityLevel | null) ?? null,
+    module: issue.CategoryIssues, reportedAt: formatDateTime(issue.created_at),
+    reportedBy: issue.ReporterName || issue.ReporterId || "Team",
     assignedTo: (() => { const job = workspace.jobs.find(job => job.issue_id === issue.id); return job && !["FAILED", "NEEDS_HUMAN_INTERVENTION"].includes(job.status) && job.review_status !== "REJECTED" ? "bob" : null; })(),
   }));
   // Modal state
   const [selectedIssue, setSelectedIssue] = useState<RawIssue | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [priorityDropdown, setPriorityDropdown] = useState<string | null>(null);
+  // Triage state
+  const [triaging, setTriaging] = useState<Record<string, boolean>>({});
+  const [triageResults, setTriageResults] = useState<Record<string, TriageResult>>({});
+  const [triageError, setTriageError] = useState("");
+  const [bulkRunning, setBulkRunning] = useState(false);
 
   const openDetail = (issue: RawIssue) => {
     setSelectedIssue(issue);
@@ -90,15 +129,59 @@ export default function IssueTriagePage() {
   const assignIssue = (id: string, target: AssignTarget) => {
     if (target === "bob") router.push("/developer/bob-tasks?issue=" + encodeURIComponent(id));
   };
-  const setPriority = () => setPriorityDropdown(null);
 
-  const unassigned = issues.filter((i) => i.assignedTo === null);
+  async function runTriage(id: string, engine: "bob" | "rules") {
+    setTriaging(state => ({ ...state, [id]: true }));
+    setTriageError("");
+    try {
+      const response = await fetch(`/api/issues/${encodeURIComponent(id)}/triage`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ engine }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Triage failed.");
+      setTriageResults(state => ({ ...state, [id]: body.triage }));
+      workspace.reload();
+    } catch (error) {
+      setTriageError(error instanceof Error ? error.message : "Triage failed.");
+    } finally {
+      setTriaging(state => ({ ...state, [id]: false }));
+    }
+  }
+
+  async function autoTriageUnclassified() {
+    setBulkRunning(true);
+    for (const issue of issues.filter(item => !item.severity)) await runTriage(issue.id, "rules");
+    setBulkRunning(false);
+  }
+
+  async function setClassification(id: string, values: { severity?: SeverityLevel; priority?: PriorityLevel }) {
+    setPriorityDropdown(null);
+    setTriageError("");
+    try {
+      const response = await fetch(`/api/issues/${encodeURIComponent(id)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Cannot update issue.");
+      workspace.reload();
+    } catch (error) {
+      setTriageError(error instanceof Error ? error.message : "Cannot update issue.");
+    }
+  }
+
+  // Most urgent first; untriaged reports last so they stand out as a group.
+  const byUrgency = (a: RawIssue, b: RawIssue) =>
+    rank(PRIORITY_LEVELS, b.priority) - rank(PRIORITY_LEVELS, a.priority) ||
+    rank(SEVERITY_LEVELS, b.severity) - rank(SEVERITY_LEVELS, a.severity);
+  const unassigned = issues.filter((i) => i.assignedTo === null).sort(byUrgency);
   const assigned = issues.filter((i) => i.assignedTo !== null);
+  const untriagedCount = issues.filter((i) => !i.severity).length;
 
   return (
     <div className="space-y-8">
       {workspace.error && <p role="alert" className="text-red-600">{workspace.error}</p>}
-      {workspace.loading && <p>Loading reports?</p>}
+      {triageError && <p role="alert" className="text-red-600 text-sm">{triageError}</p>}
+      {workspace.loading && <p>Loading reports...</p>}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -111,6 +194,19 @@ export default function IssueTriagePage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {untriagedCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkRunning}
+              onClick={() => void autoTriageUnclassified()}
+              title="Classify every untriaged report with keyword rules (instant, no Bobcoins)"
+              className="border-slate-200 text-slate-600 text-xs gap-1.5"
+            >
+              {bulkRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+              Auto-triage {untriagedCount} untriaged
+            </Button>
+          )}
           <Badge className="bg-[#ce8f5a]/10 text-[#b56e36] border border-[#ce8f5a]/30 font-semibold gap-1.5 text-xs">
             <span className="w-2 h-2 rounded-full bg-[#ce8f5a] animate-pulse" />
             {unassigned.length} Unassigned
@@ -119,12 +215,12 @@ export default function IssueTriagePage() {
       </div>
 
       {/* Unassigned Issues */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-base font-bold text-[#6287a2] flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-[#ce8f5a]" /> Unassigned Reports
           </h2>
-          <span className="text-xs text-slate-400">Sorted by urgency</span>
+          <span className="text-xs text-slate-400">Sorted by priority, then severity</span>
         </div>
 
         {unassigned.length === 0 ? (
@@ -141,7 +237,8 @@ export default function IssueTriagePage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-bold text-[#efd199] text-sm font-mono">{issue.id}</span>
-                      <UrgencyBadge urgency={issue.urgency} />
+                      <SeverityBadge severity={issue.severity} />
+                      <PriorityBadge priority={issue.priority} />
                       <span className="text-xs text-slate-400">{issue.client}</span>
                     </div>
                     <p className="text-slate-800 font-semibold text-sm leading-snug mb-1">{issue.title}</p>
@@ -156,31 +253,60 @@ export default function IssueTriagePage() {
                         <Server className="w-3 h-3 text-[#6287a2]" />{issue.repo}
                       </span>
                     </div>
+                    {triageResults[issue.id] && <TriageNote result={triageResults[issue.id]} />}
                   </div>
 
                   {/* Right: actions */}
                   <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                    {/* AI triage */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={triaging[issue.id]}
+                      onClick={() => void runTriage(issue.id, "bob")}
+                      title="Classify category, severity, and priority with IBM Bob (one short, tool-less Bob call)"
+                      className="border-[#5ec0ca]/50 text-[#449199] hover:bg-[#5ec0ca]/5 text-xs gap-1"
+                    >
+                      {triaging[issue.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      {triaging[issue.id] ? "Triaging..." : "Triage with Bob"}
+                    </Button>
+
                     {/* Set Priority dropdown */}
                     <div className="relative">
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled title="Priority persistence is not configured"
+                        onClick={() => setPriorityDropdown(priorityDropdown === issue.id ? null : issue.id)}
                         className="border-slate-200 text-slate-500 hover:bg-slate-50 text-xs gap-1"
                       >
                         <Flag className="w-3 h-3" /> Set Priority <ChevronDown className="w-3 h-3" />
                       </Button>
                       {priorityDropdown === issue.id && (
-                        <div className="absolute right-0 top-8 z-20 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden w-36">
-                          {(["HIGH", "MEDIUM", "LOW"] as Urgency[]).map((u) => (
+                        <div className="absolute right-0 top-9 z-20 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden w-44">
+                          <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Severity</p>
+                          {[...SEVERITY_LEVELS].reverse().map((level) => (
                             <button
-                              key={u}
-                              onClick={() => setPriority()}
-                              className={`w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-slate-50 transition-colors ${
-                                issue.urgency === u ? "text-[#5ec0ca]" : "text-slate-600"
+                              key={level}
+                              type="button"
+                              onClick={() => void setClassification(issue.id, { severity: level })}
+                              className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors ${
+                                issue.severity === level ? "text-[#5ec0ca]" : "text-slate-600"
                               }`}
                             >
-                              {u === "HIGH" ? "🔴 Critical" : u === "MEDIUM" ? "🟡 High (P1)" : "🔵 Normal"}
+                              {capitalize(level)}
+                            </button>
+                          ))}
+                          <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-t border-slate-100">Priority</p>
+                          {[...PRIORITY_LEVELS].reverse().map((level) => (
+                            <button
+                              key={level}
+                              type="button"
+                              onClick={() => void setClassification(issue.id, { priority: level })}
+                              className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors ${
+                                issue.priority === level ? "text-[#5ec0ca]" : "text-slate-600"
+                              }`}
+                            >
+                              {PRIORITY_LABEL[level]}
                             </button>
                           ))}
                         </div>
@@ -237,6 +363,7 @@ export default function IssueTriagePage() {
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs text-slate-400">{issue.id}</span>
                   <span className="text-sm text-slate-500">{issue.title}</span>
+                  <SeverityBadge severity={issue.severity} />
                 </div>
                 <Badge
                   className={`text-xs font-semibold ${
@@ -267,17 +394,41 @@ export default function IssueTriagePage() {
                   {selectedIssue?.title}
                 </DialogDescription>
               </div>
-              {selectedIssue && <UrgencyBadge urgency={selectedIssue.urgency} />}
+              {selectedIssue && (
+                <div className="flex items-center gap-1.5">
+                  <SeverityBadge severity={selectedIssue.severity} />
+                  <PriorityBadge priority={selectedIssue.priority} />
+                </div>
+              )}
             </div>
           </DialogHeader>
 
           <div className="p-6 space-y-5">
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Description</p>
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-sm text-slate-600 leading-relaxed">
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
                 {selectedIssue?.description}
               </div>
             </div>
+            {selectedIssue?.expected && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Expected behavior</p>
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{selectedIssue.expected}</p>
+              </div>
+            )}
+            {selectedIssue?.actual && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Actual behavior</p>
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{selectedIssue.actual}</p>
+              </div>
+            )}
+            {selectedIssue?.errorLog && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Error log</p>
+                <pre className="bg-zinc-50 border border-slate-100 rounded-xl p-3 text-xs text-[#b56e36] font-mono whitespace-pre-wrap max-h-48 overflow-auto">{selectedIssue.errorLog}</pre>
+              </div>
+            )}
+            {selectedIssue && triageResults[selectedIssue.id] && <TriageNote result={triageResults[selectedIssue.id]} />}
             <div className="flex flex-wrap gap-4">
               <span className="flex items-center gap-1.5 text-xs text-slate-500">
                 <Server className="w-3.5 h-3.5 text-[#6287a2]" />{selectedIssue?.repo}

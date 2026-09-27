@@ -93,6 +93,18 @@ export async function runBob(options: BobRunOptions): Promise<BobRunResult> {
   return capture(launch, args, options.workspacePath, options.prompt, options.timeoutMs ?? 600000, options.onLine, options.idleTimeoutMs ?? 180000);
 }
 
+/** Single-turn, tool-less classification: Bob cannot read, edit, or execute anything. */
+export const BOB_TRIAGE_ARGS = ["run", "--mode", "agent", "--format", "json", "--trust", "--accept-license", "--disable-mcp", "--disable-subagents",
+  "--disable-tool-groups", "read,edit,execute,mcp,skill,todo,subagent", "--max-turns", "1", "--max-cost", "0.1", "--log-level", "error"];
+
+export async function runBobTriage(options: { workspacePath: string; prompt: string; timeoutMs?: number; launch?: BobLaunch }): Promise<BobRunResult> {
+  const launch = options.launch || await checkBobAvailability();
+  const team = process.env.BOB_TEAM_ID;
+  if (team && !/^[A-Za-z0-9_-]{1,150}$/.test(team)) throw new Error("Invalid BOB_TEAM_ID.");
+  const args = [...BOB_TRIAGE_ARGS, ...(team ? ["--team-id", team] : [])];
+  return capture(launch, args, options.workspacePath, options.prompt, options.timeoutMs ?? 90000);
+}
+
 function capture(launch: BobLaunch, args: string[], cwd: string, input: string | undefined,
   timeoutMs: number, onLine?: (line: string) => void, idleTimeoutMs?: number): Promise<BobRunResult> {
   return new Promise((resolveResult, reject) => {
