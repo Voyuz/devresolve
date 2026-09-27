@@ -1,98 +1,71 @@
-# Security Guidelines for Watsonx Hackathon
+# DevResolve security setup
 
-## 🔒 Credential Management
+Based on the [official IBM Hackathon template](https://github.com/watsonxhackathon/ibm-hackathon-template),
+especially its [.gitignore](https://github.com/watsonxhackathon/ibm-hackathon-template/blob/main/.gitignore),
+[.bobignore](https://github.com/watsonxhackathon/ibm-hackathon-template/blob/main/.bobignore),
+and [security guidance](https://github.com/watsonxhackathon/ibm-hackathon-template/blob/main/SECURITY.MD).
 
-### ✅ DO:
+## What was adopted
 
-- ✅ Use environment variables for ALL credentials
-- ✅ Copy `.env.example` to `.env` and add your credentials there
-- ✅ Keep `.env` in `.gitignore` (already configured)
-- ✅ Use `process.env.VARIABLE_NAME` in your code
-- ✅ Review your commits before pushing (`git diff`)
-- ✅ Use placeholders when asking AI assistants for help
+| File | DevResolve adaptation |
+| --- | --- |
+| `.gitignore` | Preserve Next.js exclusions; add credential/key files, private local config, live sessions, caches, logs, backups. Keep `.env.example` and required `bob_sessions` exports available. |
+| `.bobignore` | Exclude real environment files, credentials, keys, local sensitive config, generated output and live sessions. Allow the reviewed placeholder template and project guidance. |
+| `.env.example` | Use empty values for this project's variables rather than template-specific IBM Cloud credentials. Document reserved variables explicitly. |
+| `README.md` | Add the template's pre-commit checks without replacing project documentation. |
 
-### ❌ DON'T:
+Patterns for sensitive config target local/secret files rather than the template's broad
+`*config.json` pattern, which would hide legitimate project configuration such as
+`tsconfig.json`. Credential filename patterns are safeguards, not a guarantee of detection.
+Do not name a credential file innocuously and assume these rules protect it.
 
-- ❌ Never hardcode API keys in your code
-- ❌ Never commit `.env` files
-- ❌ Never share credentials in code comments
-- ❌ Never commit files with "credential", "secret", or "password" in the name
-- ❌ Never remove patterns from `.gitignore` or `.bobignore`
-- ❌ Never paste credentials in AI assistant prompts
+## Local environment
 
-## 🤖 Using AI Assistants Safely (Bob, Copilot, etc.)
+Create `.env.local` from `.env.example` only if no local file exists. Add values manually;
+never overwrite a teammate's existing local configuration or paste values into AI prompts.
 
-### The Risk
+- The Bob Shell 2 integration prefers `BOB_API_KEY` and accepts the existing
+  `BOBSHELL_API_KEY` as a compatibility fallback. It passes the chosen key as
+  `BOB_API_KEY` to the child process, without changing your local credential file.
+- `BOB_SHELL_EXECUTABLE` can point to the installed Bob executable/JS entry;
+  `BOB_TEAM_ID` is optional team context. Neither belongs in browser configuration.
+- `GITHUB_TOKEN` is reserved for future authenticated GitHub integration and is not used today.
+- Supabase uses `NEXT_PUBLIC_SUPABASE_URL` and server-only `SUPABASE_SERVICE_ROLE_KEY`.
+  The public anon key is reserved for browser/auth integration. Public configuration is
+  visible to browser users and must never contain a private/service-role key.
+- Optional `DEVRESOLVE_DEMO_*` fields are nonsecret demo configuration. Their defaults
+  are documented as comments in `.env.example`; the example assignments stay empty.
 
-AI assistants log your prompts and code in session history files. If you share credentials with them, those credentials may be logged!
+## Before committing
 
-### Safe Practices:
+- Review `git diff` and `git diff --cached` locally. Do not paste an unreviewed diff into chat.
+- Verify `git check-ignore -v .env .env.local` reports ignore rules.
+- Check `git diff --cached --name-only` for environment, credential, key, and session files.
+- Never hardcode credentials; use environment variables and server-only modules.
+- Confirm no real credentials appear in `.env.example`, comments, prompts, or logs.
+- Review each screenshot in `bob_sessions` for keys, tokens, passwords and terminal output.
+  Preserve the required folder and `memberXX_taskXX_description_summary.png` convention.
+- Run `npm run build` before sharing configuration changes.
 
-```
-❌ BAD:  "Here's my API key: abc123xyz, help me use it"
-✅ GOOD: "Help me use environment variables for my API key"
+Ignore files do not remove tracked files, erase Git history, redact terminal output,
+or inspect screenshots. An AI ignore rule does not replace careful prompt handling.
+Live-session exclusions deliberately avoid ignoring all of `bob_sessions`, `.bob`,
+or `.codex`, so submission evidence and project instructions remain available.
 
-❌ BAD:  "Read my .env file and help me debug"
-✅ GOOD: "Help me structure my .env file (I'll add credentials myself)"
+## If a credential was exposed
 
-❌ BAD:  api_key = "abc123xyz"
-✅ GOOD: api_key = os.getenv('API_KEY')
-```
+1. Revoke/rotate it in the issuing service (IBM Bob, Supabase, or GitHub) immediately.
+2. Replace the value manually in your ignored `.env.local` and restart local processes.
+3. Remove credentials from code and shareable artifacts; keep only environment references.
+4. Review old screenshots, AI sessions, attachments, build logs, and published commits.
+5. If it reached Git history, coordinate remediation with the team and hackathon mentor.
+   Adding ignore rules does not remove history. Do not rewrite history or force-push
+   without an explicitly agreed team procedure.
 
-### Protection:
+The Bob key previously pasted into `.env.example` should be treated as exposed even
+though that example value has been cleared. A matching value in `.env.local` is expected
+local configuration, not proof that the old key has been rotated.
 
-- `.bobignore` prevents Bob from logging credential patterns
-- `.gitignore` prevents session files from being committed
-- But YOU must not share credentials in prompts!
-
-## 🚨 What Happens if You Expose Credentials?
-
-If you accidentally commit credentials:
-
-1. Your IBM Cloud account will be suspended immediately
-2. You must remove the credential from repository history
-3. You must rotate/revoke the exposed credential
-4. Your account will be restored after verification
-
-## 📝 How to Use Environment Variables
-
-### Node.js / JavaScript
-
-```javascript
-require("dotenv").config();
-const apiKey = process.env.IBM_CLOUD_API_KEY;
-```
-
-### Python
-
-```python
-import os
-from dotenv import load_dotenv
-load_dotenv()
-api_key = os.getenv('IBM_CLOUD_API_KEY')
-```
-
-### Java
-
-```java
-String apiKey = System.getenv("IBM_CLOUD_API_KEY");
-```
-
-## 🔍 Before You Commit Checklist
-
-- [ ] No hardcoded credentials in code
-- [ ] `.env` file is NOT staged for commit
-- [ ] No files with credentials in their name
-- [ ] Reviewed `git diff` for sensitive data
-- [ ] All credentials are in environment variables
-- [ ] No credentials shared with AI assistants
-
-## 🆘 Need Help?
-
-Contact hackathon support through the mentor channel.
-
-## 📚 Additional Resources
-
-- [GitHub Security Best Practices](https://docs.github.com/en/code-security)
-- [IBM Cloud Security](https://cloud.ibm.com/docs/account?topic=account-security)
-- [Environment Variables Guide](https://12factor.net/config)
+These changes do not add authentication or change application logic. The existing
+unauthenticated Bob demo endpoints remain suitable only for a trusted local demo;
+review access controls before exposing them publicly.
