@@ -66,12 +66,13 @@ export default function ProjectsPage() {
           </h1>
           <p className="text-sm text-slate-500 mt-1 max-w-2xl">
             Select a project to initiate a new bug report. Issues are automatically mapped to their respective repositories.
-            {!isDeveloper && " You see the projects you registered."}
+            {isDeveloper ? " Add a project to register a repository for a user." : " You see the projects a developer assigned to you."}
           </p>
         </div>
 
         <div className="flex items-end gap-4">
-        <AddProjectDialog onCreated={refresh} />
+        {/* Only developers register projects (and choose their owner). */}
+        {isDeveloper && <AddProjectDialog onCreated={refresh} />}
         <div className="bg-dev-slate/5 border border-dev-slate/10 p-4 rounded-2xl text-center min-w-[160px]">
           <p className="text-[10px] font-bold text-dev-slate uppercase tracking-widest mb-1">
             Registered
@@ -104,9 +105,13 @@ export default function ProjectsPage() {
       {!workspace.loading && PROJECTS_DATA.length === 0 ? (
         <div className="text-center py-20 space-y-4 border border-dashed border-zinc-200 rounded-2xl">
           <FolderOpen className="w-10 h-10 mx-auto text-zinc-300" />
-          <p className="text-dev-slate font-semibold">You have no projects yet</p>
-          <p className="text-sm text-zinc-400 max-w-md mx-auto">Add the GitHub repository of the application you want to report bugs for.</p>
-          <div className="flex justify-center"><AddProjectDialog onCreated={refresh} label="Add your first project" /></div>
+          <p className="text-dev-slate font-semibold">{isDeveloper ? "No projects yet" : "You have no projects yet"}</p>
+          <p className="text-sm text-zinc-400 max-w-md mx-auto">
+            {isDeveloper
+              ? "Register a GitHub repository and choose the user who reports bugs for it."
+              : "Ask a developer to add your application's repository to your account. It will appear here."}
+          </p>
+          {isDeveloper && <div className="flex justify-center"><AddProjectDialog onCreated={refresh} label="Add the first project" /></div>}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-24 text-zinc-300 font-medium">

@@ -80,11 +80,15 @@ test('proxy redirects anonymous pages, blocks APIs, and restricts developer area
   assert.equal(call('/api/issues/8', user, 'PATCH').status, 403);
   assert.equal(call('/api/issues/8', user).headers.get('x-middleware-next'), '1', 'reporters can read issue details');
   assert.equal(call('/api/bob/jobs/abc', user).status, 403, 'Bob job details are developer-only');
-  assert.equal(call('/api/projects', user, 'POST').headers.get('x-middleware-next'), '1', 'reporters can add projects');
+  assert.equal(call('/api/projects', user, 'POST').status, 403, 'only developers add projects');
+  assert.equal(call('/api/users', user).status, 403, 'the user list is developer-only');
+  assert.equal(call('/api/projects', user).headers.get('x-middleware-next'), '1', 'reporters can list their projects');
 
   assert.equal(call('/developer/triage', developer).headers.get('x-middleware-next'), '1');
   assert.equal(new URL(call('/', developer).headers.get('location')).pathname, '/developer');
   assert.equal(call('/api/bob/resolve', developer, 'POST').headers.get('x-middleware-next'), '1');
+  assert.equal(call('/api/projects', developer, 'POST').headers.get('x-middleware-next'), '1');
+  assert.equal(call('/api/users', developer).headers.get('x-middleware-next'), '1');
 });
 
 test('reporters only see their own projects, and the issues and jobs under them', async () => {
@@ -105,11 +109,13 @@ test('reporters only see their own projects, and the issues and jobs under them'
 
 test('new projects need a name, a plain GitHub URL, and a safe branch', async () => {
   const { validateNewProject } = await import('../lib/project-input.ts');
-  assert.deepEqual(validateNewProject({ name: ' Mini Shop ', repoUrl: 'https://github.com/o/r.git' }),
-    { name: 'Mini Shop', repoUrl: 'https://github.com/o/r.git', defaultBranch: 'main' });
+  assert.deepEqual(validateNewProject({ name: ' Mini Shop ', repoUrl: 'https://github.com/o/r.git', ownerId: 3 }),
+    { name: 'Mini Shop', repoUrl: 'https://github.com/o/r.git', defaultBranch: 'main', ownerId: '3' });
+  assert.throws(() => validateNewProject({ name: 'Mini Shop', repoUrl: 'https://github.com/o/r' }), /owns this project/, 'owner is required');
+  assert.throws(() => validateNewProject({ name: 'Mini Shop', repoUrl: 'https://github.com/o/r', ownerId: '1 OR 1=1' }), /owns this project/);
   for (const body of [{ name: 'x', repoUrl: 'https://github.com/o/r' }, { name: 'ok', repoUrl: 'cobaurl' },
     { name: 'ok', repoUrl: 'https://gitlab.com/o/r' }, { name: 'ok', repoUrl: 'https://github.com/o/r', defaultBranch: '--upload-pack=x' },
     { name: 'ok', repoUrl: 'https://github.com/o/r', defaultBranch: 'a..b' }, { name: 'ok', repoUrl: 'https://user:pw@github.com/o/r' }]) {
-    assert.throws(() => validateNewProject(body), undefined, JSON.stringify(body));
+    assert.throws(() => validateNewProject({ ownerId: '3', ...body }), /name|URL|branch/, JSON.stringify(body));
   }
 });

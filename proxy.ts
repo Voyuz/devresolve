@@ -13,7 +13,9 @@ function isDeveloperApi(path: string, method: string) {
   return (path === "/api/bob/resolve" && method === "POST")
     || /^\/api\/bob\/jobs\//.test(path)
     || /^\/api\/issues\/[^/]+\/triage$/.test(path)
-    || (/^\/api\/issues\/[^/]+$/.test(path) && method === "PATCH");
+    || (/^\/api\/issues\/[^/]+$/.test(path) && method === "PATCH")
+    || (path === "/api/projects" && method === "POST")
+    || path === "/api/users";
 }
 
 export function proxy(request: NextRequest) {

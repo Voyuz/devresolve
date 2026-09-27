@@ -3,6 +3,7 @@ import { createProject, viewerScope } from "@/lib/supabase/projects";
 import { validateNewProject } from "@/lib/project-input";
 import { canSeeProject } from "@/lib/auth/scope";
 import { requireRole, sessionFromRequest } from "@/lib/auth/session";
+import { listProfiles } from "@/lib/auth/profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -16,15 +17,18 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/projects — { name, repoUrl, defaultBranch? } registers a project owned by the signed-in profile.
+// POST /api/projects — developers only: { name, repoUrl, defaultBranch?, ownerId } registers a project owned by
+// the chosen reporter ("user" profile). The reporter then sees it on their Projects page.
 export async function POST(request: Request) {
-  const denied = requireRole(request);
+  const denied = requireRole(request, "developer");
   if (denied) return denied;
   let input;
   try { input = validateNewProject(await request.json()); }
   catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid project." }, { status: 400 }); }
   try {
-    return Response.json({ project: await createProject(sessionFromRequest(request)!.id, input) }, { status: 201 });
+    const owner = (await listProfiles()).find(profile => profile.id === input.ownerId);
+    if (!owner || owner.role !== "user") return Response.json({ error: "Choose an existing user as the project owner." }, { status: 400 });
+    return Response.json({ project: await createProject(owner.id, input) }, { status: 201 });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Cannot save the project." }, { status: 422 });
   }

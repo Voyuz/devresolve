@@ -35,6 +35,13 @@ export async function createProfile(name: string, password: string): Promise<Pub
   return { id: row.id, name: row.NamaUser, role: row.role };
 }
 
+/** All accounts (no passwords), for developers assigning project owners. */
+export async function listProfiles(): Promise<PublicProfile[]> {
+  const { data, error } = await createSupabaseServerClient().from("profiles").select('id::text,"NamaUser",role').order("NamaUser");
+  if (error) throw new Error("Cannot load users.");
+  return ((data ?? []) as unknown as { id: string; NamaUser: string; role: AppRole }[]).map(row => ({ id: row.id, name: row.NamaUser, role: row.role }));
+}
+
 /** Profile display names by ID, for showing who reported an issue. */
 export async function profileNames(): Promise<Map<string, string>> {
   const { data, error } = await createSupabaseServerClient().from("profiles").select('id::text,"NamaUser"');

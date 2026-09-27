@@ -18,7 +18,7 @@ Report → AI Triage → Repository mapping → Bob investigates → Fix → Tes
 |---|---|---|
 | Sign in / register | `/auth/login`, `/auth/register` | Accounts from the `profiles` table; developer pages require role `developer` |
 | Dashboard | `/dashboard` | Open, in-progress, resolved, and critical counts per project |
-| Projects | `/projects` | Your projects (developers see all), live GitHub status, and **Add project** (checked against GitHub) |
+| Projects | `/projects` | Your projects (developers see all) with live GitHub status; developers **Add project** for a chosen user (checked against GitHub) |
 | Report an issue | `/issues/new` | Title, description, expected/actual behavior, error log; auto-triaged on submit |
 | My Issues | `/issues` | Reporter view of every issue and its current stage |
 | Issue detail | `/issues/[id]` | Full report, triage, workflow progress, and every Bob round |
