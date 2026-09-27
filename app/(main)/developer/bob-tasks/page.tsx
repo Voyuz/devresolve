@@ -52,7 +52,14 @@ function StateBadge({ state }: { state: RoundState }) {
   return <span title={state.meaning} className={`inline-flex text-xs font-semibold px-2 py-0.5 rounded-md border ${TONE_CLASS[state.tone]}`}>{state.label}</span>;
 }
 
+// useSearchParams needs a Suspense boundary for static rendering.
 export default function BobResolutionPage() {
+  return <React.Suspense fallback={<p className="text-slate-500 text-sm">Loading...</p>}><BobResolutionContent /></React.Suspense>;
+}
+
+function BobResolutionContent() {
+  const params = useSearchParams();
+  const selection = { job: params.get("job") || undefined, issue: params.get("issue") || undefined, previousJob: params.get("previousJob") || undefined };
   const workspace = useWorkspace();
   const tasks: IssueTask[] = [...new Set(workspace.jobs.map(job => job.issue_id))].map(issueId => {
     const issue = workspace.issues.find(item => item.id === issueId);
@@ -70,6 +77,32 @@ export default function BobResolutionPage() {
   const queue = tasks.filter(task => task.state.key !== "published")
     .sort((a, b) => (SEVERITY_RANK[b.urgency ?? ""] ?? 0) - (SEVERITY_RANK[a.urgency ?? ""] ?? 0) || b.startedAt.localeCompare(a.startedAt));
   const resolved = tasks.filter(task => task.state.key === "published").sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+
+  if (selection.job || selection.issue) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-[#6287a2] flex items-center gap-2">
+              <Cpu className="text-[#5ec0ca] w-6 h-6" />
+              Bob Resolution
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              {selection.issue ? "Run IBM Bob on a reported issue." : "Review what IBM Bob changed, then approve, request changes, or reject."}
+            </p>
+          </div>
+          <Link href="/developer/bob-tasks" className="shrink-0 text-sm font-semibold text-[#449199] hover:underline">
+            ← Back to queue
+          </Link>
+        </div>
+        <BobIssueForm key={[selection.issue, selection.previousJob, selection.job].join("|")} embedded
+          jobId={selection.issue ? undefined : selection.job} issueId={selection.issue}
+          previousJobId={selection.issue ? selection.previousJob : undefined}
+          reviewOnly={Boolean(selection.job && !selection.issue)} basePath="/developer/bob-tasks"
+          heading={selection.issue ? "Bob investigation" : "Developer review"} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -200,15 +233,7 @@ export default function BobResolutionPage() {
         </div>
       )}
 
-      {/* ===== REVIEW MODAL ===== */}
-      <React.Suspense fallback={<p>Loading selected task...</p>}><BobTaskDetail /></React.Suspense>
+      <p className="text-slate-500 text-sm">Open an issue above to review Bob&apos;s result, or assign a report from the Issues inbox to start Bob.</p>
     </div>
   );
-}
-
-function BobTaskDetail() {
-  const params = useSearchParams();
-  const selection = { job: params.get("job") || undefined, issue: params.get("issue") || undefined, previousJob: params.get("previousJob") || undefined };
-  if (!selection.job && !selection.issue) return <p className="text-slate-500 text-sm">Open a result above, or select a report in the Issue Inbox to start Bob.</p>;
-  return <BobIssueForm key={[selection.issue, selection.previousJob, selection.job].join("|")} jobId={selection.issue ? undefined : selection.job} issueId={selection.issue} previousJobId={selection.issue ? selection.previousJob : undefined} reviewOnly={Boolean(selection.job && !selection.issue)} basePath="/developer/bob-tasks" heading={selection.issue ? "Bob investigation" : "Developer review"} />;
 }

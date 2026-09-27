@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { BobResolveResult, BobActivityEvent, BobProject, BobStoredJob } from "@/types/bob";
 import { formatDateTime } from "@/lib/utils";
 import { explainReason, roundState, TONE_CLASS } from "@/components/bob/round-status";
+import { PatchView } from "@/components/bob/patch-view";
 
 const KIND_ICON: Record<string, string> = {
   repository_loaded: "📂",
@@ -36,7 +37,7 @@ function validationStats(activity: BobActivityEvent[]) {
   };
 }
 
-export default function BobIssueForm({ basePath = "/issues/new", heading = "Report an issue", issueId, jobId: requestedJobId, previousJobId, reviewOnly = false }: { basePath?: string; heading?: string; issueId?: string; jobId?: string; previousJobId?: string; reviewOnly?: boolean }) {
+export default function BobIssueForm({ basePath = "/issues/new", heading = "Report an issue", issueId, jobId: requestedJobId, previousJobId, reviewOnly = false, embedded = false }: { basePath?: string; heading?: string; issueId?: string; jobId?: string; previousJobId?: string; reviewOnly?: boolean; embedded?: boolean }) {
   const [projects, setProjects] = useState<BobProject[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectId, setProjectId] = useState("");
@@ -204,16 +205,21 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
   }
 
   return (
-    <section ref={sectionRef} className="mx-auto max-w-3xl scroll-mt-24 space-y-6 rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
+    <section ref={sectionRef} className={embedded
+      // Inside a page: full width, same card style as the page's tables; the page provides navigation.
+      ? "scroll-mt-24 space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+      : "mx-auto max-w-3xl scroll-mt-24 space-y-6 rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm"}>
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">{heading}</h1>
+        <h2 className={embedded ? "text-xl font-bold text-[#6287a2]" : "text-2xl font-semibold"}>{heading}</h2>
         <p className="text-sm text-muted-foreground">
           {issueId && previousJobId ? `Run Bob again on issue #${issueId} with the reviewer's requested changes.`
             : issueId ? `Investigate saved issue #${issueId}.` : reviewOnly ? "Review the saved Bob result and publish the approved fix to GitHub." : "Submit a bug report and watch IBM Bob Shell investigate and fix it."}
         </p>
-        <Link href="/dashboard" className="text-sm underline underline-offset-4">
-          ← Back to Dashboard
-        </Link>
+        {!embedded && (
+          <Link href="/dashboard" className="text-sm underline underline-offset-4">
+            ← Back to Dashboard
+          </Link>
+        )}
       </div>
 
       {projectError && <p role="alert" className="text-sm text-destructive">{projectError}</p>}
@@ -442,15 +448,29 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
             );
           })()}
 
-          {/* Root cause */}
+          {/* What Bob found and how it validated the fix: read these before the code and the decision. */}
+          {result.rootCause && (
+            <Section title="Root cause">
+              <p className="text-sm">{result.rootCause}</p>
+            </Section>
+          )}
+
+          {/* Validation */}
+          {result.validationSummary && (
+            <Section title="Validation">
+              <p className="text-sm">{result.validationSummary}</p>
+            </Section>
+          )}
+
+          {/* Human review: code changes and the decision */}
           {result.review && (
             <Section title="Human review">
               <p className="text-sm">Review status: {result.review.status}</p>
               <p className="mt-2 text-xs text-muted-foreground">Approve saves this fix as a commit on GitHub branch {result.review.branch}. Request changes sends your feedback back to Bob for another round. Reject leaves GitHub unchanged.</p>
-              <details className="mt-3" open>
-                <summary className="cursor-pointer text-sm font-medium">Review code changes</summary>
-                <pre className="mt-2 max-h-96 overflow-auto whitespace-pre text-xs">{result.review.patch}</pre>
-              </details>
+              <div className="mt-3 space-y-2">
+                <p className="text-sm font-medium">Code changes</p>
+                <PatchView patch={result.review.patch} />
+              </div>
               {result.review.commitUrl && <a href={result.review.commitUrl} target="_blank" rel="noopener noreferrer" className="mt-3 block text-sm underline">View approved commit on GitHub</a>}
               {result.review.error && <p role="alert" className="mt-2 text-sm text-destructive">{result.review.error}</p>}
               {["PENDING", "PUBLISH_FAILED"].includes(result.review.status) && (
@@ -502,12 +522,6 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
               Run Bob again for issue #{result.issueId}
             </Link>
           )}
-          {result.rootCause && (
-            <Section title="Root cause">
-              <p className="text-sm">{result.rootCause}</p>
-            </Section>
-          )}
-
           {/* Reason (human intervention / failure) */}
           {result.reason && (
             <Section title={result.status === "NEEDS_HUMAN_INTERVENTION" ? "Why human intervention is needed" : "Reason"}>
@@ -540,15 +554,8 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
             </Section>
           )}
 
-          {/* Validation */}
-          {result.validationSummary && (
-            <Section title="Validation">
-              <p className="text-sm">{result.validationSummary}</p>
-            </Section>
-          )}
-
-          {/* Changed files */}
-          {result.changedFiles.length > 0 && (
+          {/* Changed files (the per-file diff above already lists them when a review exists) */}
+          {!result.review && result.changedFiles.length > 0 && (
             <Section title="Changed files">
               <ul className="space-y-1">
                 {result.changedFiles.map((f) => (
@@ -574,8 +581,11 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
 
           {/* Activity log */}
           {result.activity.length > 0 && (
-            <Section title={`Agent activity (${result.activity.length} events)`}>
-              <ol className="space-y-1">
+            <details className="rounded-md border border-border bg-muted/30">
+              <summary className="cursor-pointer px-3 py-2 text-sm font-semibold select-none">
+                Agent activity ({result.activity.length} events)
+              </summary>
+              <ol className="space-y-1 px-3 pb-3">
                 {result.activity.map((ev: BobActivityEvent, i: number) => (
                   <li key={i} className="flex items-start gap-2 text-xs">
                     <span className="shrink-0">{KIND_ICON[ev.kind] ?? "•"}</span>
@@ -588,7 +598,7 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
                   </li>
                 ))}
               </ol>
-            </Section>
+            </details>
           )}
         </div>
       )}
