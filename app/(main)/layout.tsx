@@ -10,9 +10,9 @@ export default function MainDashboardLayout({ children }: { children: React.Reac
     <div className="flex min-h-screen bg-[#fcfcfd]">
       {/* Sidebar - Always Present */}
       <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-      
+
       {/* Content Area - Adjusts margin when sidebar collapses */}
-      <div 
+      <div
         className="flex-1 flex flex-col transition-all duration-300 ease-in-out"
         style={{ paddingLeft: isCollapsed ? "80px" : "256px" }}
       >

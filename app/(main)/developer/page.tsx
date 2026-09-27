@@ -9,36 +9,13 @@ import {
   GitMerge,
   Activity,
   BarChart3,
-  Users,
   ShieldCheck,
 } from "lucide-react";
+import { useWorkspace, issueStatus } from "@/components/layout/use-workspace";
 import { Badge } from "@/components/ui/badge";
 
-// --- MOCK DATA ---
-const projectHealth = [
-  { name: "finpay-api", client: "FinTech Indo Ltd.", openIssues: 3, resolved: 14, inProgress: 1, health: "warning" },
-  { name: "minishop-ecommerce", client: "E-Commerce Prime", openIssues: 1, resolved: 9, inProgress: 2, health: "good" },
-  { name: "fleet-track", client: "Logistics Corp", openIssues: 4, resolved: 6, inProgress: 1, health: "critical" },
-  { name: "frontend-web", client: "Internal QA", openIssues: 2, resolved: 20, inProgress: 0, health: "good" },
-  { name: "reporting-service", client: "Startup X", openIssues: 0, resolved: 5, inProgress: 0, health: "good" },
-];
-
-const recentActivity = [
-  { time: "2m ago", event: "Bob AI resolved ISS-105 (Export CSV format)", type: "resolved" },
-  { time: "1h ago", event: "ISS-088 assigned to Bob AI — Logistics Corp", type: "assigned" },
-  { time: "2h ago", event: "Developer accepted fix for ISS-092 — FinTech Indo", type: "accepted" },
-  { time: "4h ago", event: "ISS-094 fix generated — awaiting review", type: "pending" },
-  { time: "Yesterday", event: "ISS-102 reported by Internal QA", type: "new" },
-];
-
-const stats = [
-  { label: "Total Open Issues", value: 10, icon: AlertTriangle, color: "text-[#ce8f5a]", border: "border-[#ce8f5a]/30", bg: "bg-[#ce8f5a]/5" },
-  { label: "In Progress (Bob AI)", value: 4, icon: Cpu, color: "text-[#5ec0ca]", border: "border-[#5ec0ca]/30", bg: "bg-[#5ec0ca]/5" },
-  { label: "Resolved This Week", value: 7, icon: CheckCircle2, color: "text-[#80c8bc]", border: "border-[#80c8bc]/30", bg: "bg-[#80c8bc]/5" },
-  { label: "Active Projects", value: 5, icon: BarChart3, color: "text-[#6287a2]", border: "border-[#6287a2]/30", bg: "bg-[#6287a2]/5" },
-];
-
 function HealthDot({ health }: { health: string }) {
+  if (health === "unknown") return <span className="text-xs text-slate-400">Not monitored</span>;
   if (health === "good") return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#2c7a6e]"><span className="w-2 h-2 rounded-full bg-[#80c8bc]" />Healthy</span>;
   if (health === "warning") return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#b87643]"><span className="w-2 h-2 rounded-full bg-[#ce8f5a]" />Warning</span>;
   return <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500"><span className="w-2 h-2 rounded-full bg-red-400" />Critical</span>;
@@ -56,8 +33,28 @@ function ActivityDot({ type }: { type: string }) {
 }
 
 export default function DevOverviewPage() {
+  const workspace = useWorkspace();
+  const projectHealth = workspace.projects.map(project => {
+    const issues = workspace.issues.filter(issue => issue.ProjekId === project.id);
+    return { name: project.name, client: project.id, resolved: issues.filter(issue => issueStatus(workspace.jobs.find(job => job.issue_id === issue.id), issue.Status) === "RESOLVED").length,
+      openIssues: issues.filter(issue => issueStatus(workspace.jobs.find(job => job.issue_id === issue.id), issue.Status) === "OPEN").length,
+      inProgress: issues.filter(issue => issueStatus(workspace.jobs.find(job => job.issue_id === issue.id), issue.Status) === "IN_PROGRESS").length,
+      health: "unknown" };
+  });
+  const recentActivity = workspace.jobs.slice(0, 5).map(job => ({ time: new Date(job.created_at).toLocaleString(), event: "Issue #" + job.issue_id + ": " + (job.review_status || job.status), type: job.review_status === "APPROVED" ? "accepted" : "pending" }));
+const stats = [
+  { label: "Total Open Issues", value: projectHealth.reduce((total, project) => total + project.openIssues, 0), icon: AlertTriangle, color: "text-[#ce8f5a]", border: "border-[#ce8f5a]/30", bg: "bg-[#ce8f5a]/5" },
+  { label: "In Progress (Bob AI)", value: projectHealth.reduce((total, project) => total + project.inProgress, 0), icon: Cpu, color: "text-[#5ec0ca]", border: "border-[#5ec0ca]/30", bg: "bg-[#5ec0ca]/5" },
+  { label: "Published Fixes", value: workspace.jobs.filter(job => job.review_status === "APPROVED").length, icon: CheckCircle2, color: "text-[#80c8bc]", border: "border-[#80c8bc]/30", bg: "bg-[#80c8bc]/5" },
+  { label: "Active Projects", value: workspace.projects.length, icon: BarChart3, color: "text-[#6287a2]", border: "border-[#6287a2]/30", bg: "bg-[#6287a2]/5" },
+];
+
+
+
   return (
     <div className="space-y-8">
+      {workspace.error && <p role="alert" className="text-red-600">{workspace.error}</p>}
+      {workspace.loading && <p>Loading developer overview...</p>}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -161,8 +158,8 @@ export default function DevOverviewPage() {
         <div>
           <h3 className="text-sm font-bold text-[#449199] mb-1">IBM Bob AI Agent — Pipeline Summary</h3>
           <p className="text-sm text-slate-600 leading-relaxed">
-            Bob AI is currently processing <strong>4 active tasks</strong> across 3 projects. 
-            2 fixes are awaiting developer review. Average resolution time this week: <strong>1h 24m</strong>.
+            Bob has <strong>{workspace.jobs.filter(job => ["QUEUED", "CLONING", "INVESTIGATING", "FIXING", "VALIDATING"].includes(job.status)).length} active jobs</strong>.
+            {" "}{workspace.jobs.filter(job => job.status === "READY_FOR_REVIEW" && job.review_status === "PENDING").length} fixes are awaiting developer review.
           </p>
         </div>
       </div>

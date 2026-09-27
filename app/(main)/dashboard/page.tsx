@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Issue } from "@/types/issues";
+import DashboardClient from "./DashboardClient";
 
 async function getStats() {
   const supabase = createAdminClient();
@@ -103,6 +104,9 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* IBM Bob Hackathon Read-Only View */}
+        <DashboardClient />
       </main>
     </div>
   );

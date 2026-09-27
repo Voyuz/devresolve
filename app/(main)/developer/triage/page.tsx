@@ -13,6 +13,8 @@ import {
   Inbox,
   ChevronDown,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useWorkspace } from "@/components/layout/use-workspace";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -41,76 +43,8 @@ interface RawIssue {
   assignedTo: AssignTarget;
 }
 
-// --- MOCK DATA — semua status unassigned ---
-const initialIssues: RawIssue[] = [
-  {
-    id: "ISS-110",
-    client: "FinTech Indo Ltd.",
-    title: "Payment callback returns 422 on duplicate transaction ID",
-    description:
-      "When the payment gateway retries a callback with the same transaction ID, the server responds with 422 Unprocessable Entity instead of 200 OK idempotent response. This causes double charge on the client side.",
-    urgency: "HIGH",
-    module: "callback-handler.ts",
-    repo: "devresolve/finpay-api",
-    reportedAt: "30 minutes ago",
-    reportedBy: "ops-team@fintech.id",
-    assignedTo: null,
-  },
-  {
-    id: "ISS-111",
-    client: "E-Commerce Prime",
-    title: "Search autocomplete freezes on mobile Safari",
-    description:
-      "The product search autocomplete dropdown does not close after selection on iOS Safari 17. The input also becomes unresponsive after the first tap.",
-    urgency: "MEDIUM",
-    module: "SearchBar.tsx",
-    repo: "devresolve/minishop-ecommerce",
-    reportedAt: "1 hour ago",
-    reportedBy: "qa@ecommerceprime.co",
-    assignedTo: null,
-  },
-  {
-    id: "ISS-112",
-    client: "Logistics Corp",
-    title: "Driver location not updating in real-time on dashboard",
-    description:
-      "The map on the dispatch dashboard stops refreshing driver locations after 10 minutes of inactivity. A page reload is required to restore updates. WebSocket connection appears to drop silently.",
-    urgency: "HIGH",
-    module: "map-socket.ts",
-    repo: "devresolve/fleet-track",
-    reportedAt: "2 hours ago",
-    reportedBy: "support@logisticscorp.id",
-    assignedTo: null,
-  },
-  {
-    id: "ISS-113",
-    client: "Internal QA",
-    title: "Dark mode toggle resets on page navigation",
-    description:
-      "User theme preference (dark mode) is not persisted between page transitions. Every navigation resets the theme to light mode.",
-    urgency: "LOW",
-    module: "theme-provider.tsx",
-    repo: "devresolve/frontend-web",
-    reportedAt: "3 hours ago",
-    reportedBy: "qa-internal",
-    assignedTo: null,
-  },
-  {
-    id: "ISS-114",
-    client: "Startup X",
-    title: "PDF report generation crashes for datasets > 5000 rows",
-    description:
-      "Generating a PDF report with more than 5000 data rows causes the server worker to time out and return a 504 error. Memory profiling shows the renderer holds all rows in memory at once.",
-    urgency: "MEDIUM",
-    module: "pdf-generator.py",
-    repo: "devresolve/reporting-service",
-    reportedAt: "5 hours ago",
-    reportedBy: "dev@startupx.io",
-    assignedTo: null,
-  },
-];
 
-const URGENCY_ORDER: Record<Urgency, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+
 
 function UrgencyBadge({ urgency }: { urgency: Urgency }) {
   if (urgency === "HIGH")
@@ -133,10 +67,16 @@ function UrgencyBadge({ urgency }: { urgency: Urgency }) {
 }
 
 export default function IssueTriagePage() {
-  const [issues, setIssues] = useState<RawIssue[]>(
-    [...initialIssues].sort((a, b) => URGENCY_ORDER[a.urgency] - URGENCY_ORDER[b.urgency])
-  );
-
+  const workspace = useWorkspace();
+  const router = useRouter();
+  const issues: RawIssue[] = workspace.issues.map(issue => ({
+    id: issue.id, title: issue.title, description: issue.description,
+    client: workspace.projects.find(project => project.id === issue.ProjekId)?.name || issue.ProjekId,
+    repo: workspace.projects.find(project => project.id === issue.ProjekId)?.repoUrl || "",
+    urgency: "LOW", module: issue.CategoryIssues, reportedAt: issue.created_at,
+    reportedBy: issue.ReporterId || "Team",
+    assignedTo: (() => { const job = workspace.jobs.find(job => job.issue_id === issue.id); return job && !["FAILED", "NEEDS_HUMAN_INTERVENTION"].includes(job.status) && job.review_status !== "REJECTED" ? "bob" : null; })(),
+  }));
   // Modal state
   const [selectedIssue, setSelectedIssue] = useState<RawIssue | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -148,25 +88,17 @@ export default function IssueTriagePage() {
   };
 
   const assignIssue = (id: string, target: AssignTarget) => {
-    setIssues((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, assignedTo: target } : i))
-    );
-    setIsDetailOpen(false);
+    if (target === "bob") router.push("/developer/bob-tasks?issue=" + encodeURIComponent(id));
   };
-
-  const setPriority = (id: string, urgency: Urgency) => {
-    setIssues((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, urgency } : i))
-        .sort((a, b) => URGENCY_ORDER[a.urgency] - URGENCY_ORDER[b.urgency])
-    );
-    setPriorityDropdown(null);
-  };
+  const setPriority = () => setPriorityDropdown(null);
 
   const unassigned = issues.filter((i) => i.assignedTo === null);
   const assigned = issues.filter((i) => i.assignedTo !== null);
 
   return (
     <div className="space-y-6">
+      {workspace.error && <p role="alert" className="text-red-600">{workspace.error}</p>}
+      {workspace.loading && <p>Loading reports?</p>}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -233,9 +165,7 @@ export default function IssueTriagePage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() =>
-                          setPriorityDropdown(priorityDropdown === issue.id ? null : issue.id)
-                        }
+                        disabled title="Priority persistence is not configured"
                         className="border-slate-200 text-slate-500 hover:bg-slate-50 text-xs gap-1"
                       >
                         <Flag className="w-3 h-3" /> Set Priority <ChevronDown className="w-3 h-3" />
@@ -245,7 +175,7 @@ export default function IssueTriagePage() {
                           {(["HIGH", "MEDIUM", "LOW"] as Urgency[]).map((u) => (
                             <button
                               key={u}
-                              onClick={() => setPriority(issue.id, u)}
+                              onClick={() => setPriority()}
                               className={`w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-slate-50 transition-colors ${
                                 issue.urgency === u ? "text-[#5ec0ca]" : "text-slate-600"
                               }`}
@@ -261,7 +191,7 @@ export default function IssueTriagePage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => assignIssue(issue.id, "human")}
+                      disabled title="Human assignment is not configured"
                       className="border-[#6287a2]/40 text-[#6287a2] hover:bg-[#6287a2]/5 text-xs gap-1"
                     >
                       <User className="w-3 h-3" /> Assign to Dev
@@ -368,7 +298,7 @@ export default function IssueTriagePage() {
           <DialogFooter className="flex-col sm:flex-row gap-2 p-5 border-t border-slate-100 bg-slate-50/60 rounded-b-2xl">
             <Button
               variant="outline"
-              onClick={() => selectedIssue && assignIssue(selectedIssue.id, "human")}
+              disabled title="Human assignment is not configured"
               className="border-[#6287a2]/40 text-[#6287a2] hover:bg-[#6287a2]/5 font-semibold gap-1.5"
             >
               <User className="w-4 h-4" /> Assign to Human Dev

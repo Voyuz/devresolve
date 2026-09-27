@@ -2,6 +2,7 @@
 import { Bell, UserCircle, ArrowRightLeft, LayoutGrid, LogOut } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function TopBar() {
   const pathname = usePathname();
@@ -19,7 +20,8 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-6">
-        <button 
+        <ThemeToggle />
+        <button
           onClick={() => router.push(isDevMode ? "/dashboard" : "/developer")}
           className="flex items-center gap-2 px-4 py-2 rounded-full border border-dev-terracotta/30 text-dev-terracotta text-action hover:bg-dev-terracotta/5 transition-all"
         >
@@ -31,8 +33,8 @@ export function TopBar() {
           <Bell size={18} className="text-zinc-400 cursor-pointer hover:text-dev-cyan" />
           <div className="flex items-center gap-3">
             <div className="text-right leading-none">
-              <p className="text-action text-dev-slate">Rangga Pratama</p>
-              <p className="text-[10px] text-zinc-400 font-medium">QA Tester</p>
+              <p className="text-action text-dev-slate">Team demo</p>
+              <p className="text-[10px] text-zinc-400 font-medium">Shared workspace</p>
             </div>
             <div className="w-9 h-9 rounded-full bg-zinc-100 border-2 border-dev-sand flex items-center justify-center">
               <UserCircle className="w-6 h-6 text-zinc-400" />

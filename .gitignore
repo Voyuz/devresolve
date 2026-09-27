@@ -108,6 +108,121 @@ build/
 *.log
 
 # Backup files
+# additional tooling
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+/coverage
+*.pem
+.pnpm-debug.log*
+
+# Security patterns adapted from the official IBM Hackathon template.
+# Preserve AGENTS.md and bob_sessions/ submission evidence.
+*.env
+env.local
+
+# Credential files and local sensitive configuration
+credentials/
+.credentials/
+secrets/
+secrets
+secret
+.secrets
+.secret
+.secrets/
+secrets
+secret
+.secrets
+.secret
+*credentials*
+*Credentials*
+*CREDENTIALS*
+*secret*.json
+*secret*.yaml
+*secret*.yml
+*secret*.toml
+*secret*.ini
+*secret*.txt
+*SECRET*.json
+*SECRET*.yaml
+*SECRET*.yml
+*SECRET*.toml
+*SECRET*.ini
+*SECRET*.txt
+*Secrets*
+*password*.json
+*password*.txt
+*PASSWORD*.json
+*PASSWORD*.txt
+*token*.json
+*token*.yaml
+*token*.yml
+*TOKEN*.json
+*TOKEN*.yaml
+*TOKEN*.yml
+*apikey*
+*api-key*
+*api_key*
+*API_KEY*
+*API KEY*
+*api key*
+config.local.*
+config.secret.*
+database.yml
+database.json
+db-config.*
+.npmrc
+.netrc
+_netrc
+.git-credentials
+.aws/
+.ssh/
+.kube/config
+
+# Private keys and credential containers
+*.pem
+*.key
+*.p12
+*.pfx
+*.ppk
+*.cer
+*.crt
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+
+# Live sessions, local caches, and logs (not bob_sessions exports)
+.copilot/
+.cursor/
+.codeium/
+.bob/sessions/
+.bob/tasks/
+.bob/cache/
+.bob/logs/
+.bob/history/
+.codex/sessions/
+.codex/cache/
+.codex/logs/
+.codex/auth.json
+.codex/config.local.toml
+.sessions/
+.cache/
+.npm/
+.turbo/
+.parcel-cache/
+*.log
+
+# Build outputs, editor state, and local backups
+dist/
+build/
+.idea/
+*.swp
+*.swo
 *.bak
 *.tmp
 *.temp
@@ -120,3 +235,6 @@ build/
 # ============================================
 # Next.js Build Output
 .next/
+
+# Keep the empty template available to Git.
+!.env.example
