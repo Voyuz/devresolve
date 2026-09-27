@@ -74,6 +74,7 @@ db-config.*
 
 # Node.js
 node_modules/
+.local-tools/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

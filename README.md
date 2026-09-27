@@ -62,6 +62,8 @@ self-resolution loop visible.
 
 ### Install and configure
 
+Windows developers can use `/developer/setup` for one approved Node.js 24 + Bob Shell setup. If Node is not installed yet, run the standalone bootstrap first; see [combined Bob setup](docs/bob-setup.md). Compatible existing installations are preserved.
+
 ```sh
 npm install
 ```

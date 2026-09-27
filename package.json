@@ -12,7 +12,8 @@
     "test:review": "node --test tests/bob-review.test.mjs",
     "test:workspace": "node --test tests/workspace.test.mjs",
     "test:triage": "node --test tests/triage.test.mjs",
-    "test:auth": "node --test tests/auth.test.mjs"
+    "test:auth": "node --test tests/auth.test.mjs",
+    "test:setup": "node --test tests/bob-setup.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

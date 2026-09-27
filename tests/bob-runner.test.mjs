@@ -64,6 +64,24 @@ test('missing configured executable produces a useful blocker', async () => {
   finally { process.env.BOB_SHELL_EXECUTABLE = previous; }
 });
 
+test('project-local Bob is discovered without PATH or a configured executable', async () => {
+  const previous = { cwd: process.cwd(), executable: process.env.BOB_SHELL_EXECUTABLE };
+  const entry = join(workspace, '.local-tools', 'bob', 'node_modules', 'bobshell', 'dist', 'bob.js');
+  await mkdir(dirname(entry), { recursive: true });
+  await copyFile(fileURLToPath(new URL('./fixtures/bob-shell.mjs', import.meta.url)), entry);
+  try {
+    delete process.env.BOB_SHELL_EXECUTABLE;
+    process.chdir(workspace);
+    const launch = await checkBobAvailability();
+    assert.equal(launch.prefix[0], entry);
+  } finally {
+    process.chdir(previous.cwd);
+    if (previous.executable === undefined) delete process.env.BOB_SHELL_EXECUTABLE;
+    else process.env.BOB_SHELL_EXECUTABLE = previous.executable;
+    await rm(entry);
+  }
+});
+
 test('Windows automatically discovers the current user npm installation without a configured executable or PATH entry', {skip:process.platform!=='win32'}, async()=>{
   const previous={executable:process.env.BOB_SHELL_EXECUTABLE,path:process.env.PATH,appdata:process.env.APPDATA};
   const appdata=join(workspace,'roaming');

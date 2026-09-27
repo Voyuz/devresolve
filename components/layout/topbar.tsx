@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { SessionUser } from "@/types/issues";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useBobStatus } from "@/components/layout/use-bob-status";
+import Link from "next/link";
 
 export function TopBar() {
   const pathname = usePathname();
@@ -27,6 +28,7 @@ export function TopBar() {
 
       <div className="flex items-center gap-6">
         <ThemeToggle />
+        {isDeveloper && bob && !bob.ready && <Link href="/developer/setup" className="rounded-full border border-amber-300 px-3 py-2 text-sm text-amber-800">Set up Bob</Link>}
         {/* Developers can also use the reporter pages (issue detail, projects, reporting); reporters never see this. */}
         {isDeveloper && (
           <button

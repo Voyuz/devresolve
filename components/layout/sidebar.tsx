@@ -19,6 +19,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
         { name: "Dashboard", icon: Home, href: "/developer" },
         { name: "Issues", icon: Bug, href: "/developer/triage" },
         { name: "Bob Resolution", icon: Cpu, href: "/developer/bob-tasks" },
+        { name: "Bob Setup", icon: Zap, href: "/developer/setup" },
         { name: "Register User", icon: UserPlus, href: "/developer/users/new" },
       ]
     : [

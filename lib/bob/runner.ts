@@ -35,13 +35,20 @@ export function bobEnvironment(): NodeJS.ProcessEnv {
   return env;
 }
 
-async function resolveLaunch(): Promise<BobLaunch> {
+async function nodeForEntry(entry: string): Promise<BobLaunch> {
+  const localNode = join(process.cwd(), ".local-tools", "node", process.platform === "win32" ? "node.exe" : "bin/node");
+  try { await access(localNode, constants.F_OK); return { command: localNode, prefix: [entry] }; }
+  catch { return { command: process.execPath, prefix: [entry] }; }
+}
+
+export async function resolveLaunch(): Promise<BobLaunch> {
   const configured = process.env.BOB_SHELL_EXECUTABLE?.trim();
   const candidates: string[] = [];
   if (configured) {
     if (!isAbsolute(configured)) throw new Error("BOB_SHELL_EXECUTABLE must be an absolute path to Bob Shell.");
     candidates.push(configured);
   } else {
+    candidates.push(join(process.cwd(), ".local-tools", "bob", "node_modules", "bobshell", "dist", "bob.js"));
     const suffixes = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
     const directories = (process.env.PATH || "").split(delimiter).filter(Boolean);
     // npm's user bin may be missing from a server process's older PATH.
@@ -58,7 +65,7 @@ async function resolveLaunch(): Promise<BobLaunch> {
   for (const candidate of candidates) {
     try { await access(candidate, constants.F_OK); } catch { continue; }
     const extension = extname(candidate).toLowerCase();
-    if ([".js", ".mjs", ".cjs"].includes(extension)) return { command: process.execPath, prefix: [candidate] };
+    if ([".js", ".mjs", ".cjs"].includes(extension)) return nodeForEntry(candidate);
     if (extension === ".cmd" || extension === ".bat") {
       // Resolve an npm Node shim without cmd.exe or interpolating shell arguments.
       const shim = await readFile(candidate, "utf8");
@@ -66,7 +73,7 @@ async function resolveLaunch(): Promise<BobLaunch> {
       if (!script) throw new Error("Bob's Windows launcher is not a supported Node shim. Set BOB_SHELL_EXECUTABLE to its .exe or JavaScript entry point.");
       const entry = resolve(dirname(candidate), script);
       await access(entry, constants.F_OK);
-      return { command: process.execPath, prefix: [entry] };
+      return nodeForEntry(entry);
     }
     return { command: candidate, prefix: [] };
   }
