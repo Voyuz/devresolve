@@ -28,23 +28,17 @@ export default function ProjectsPage() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto py-4">
+    <div className="space-y-8">
 
       {/* ── Header ── */}
-      <div className="mb-10 flex justify-between items-end">
+      <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2 text-dev-cyan mb-2">
-            <FolderOpen size={16} />
-            <span className="text-[11px] font-bold uppercase tracking-widest">
-              Reporter Mode / Projects
-            </span>
-          </div>
-          <h1 className="text-[32px] font-bold text-dev-slate leading-tight">
-            Select Target Repository
+          <h1 className="text-2xl font-bold text-[#6287a2] flex items-center gap-2">
+            <FolderOpen className="text-[#5ec0ca] w-6 h-6" />
+            Projects
           </h1>
-          <p className="text-sm text-zinc-400 mt-1 max-w-2xl">
-            Choose a project to open a new bug report. Issues will be automatically
-            mapped to the repository for IBM Bob 2.0 analysis.
+          <p className="text-sm text-slate-500 mt-1 max-w-2xl">
+            Select a project to initiate a new bug report. Issues are automatically mapped to their respective repositories.
           </p>
         </div>
 

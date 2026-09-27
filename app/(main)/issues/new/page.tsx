@@ -163,7 +163,7 @@ function NewIssueForm() {
   // ── Success screen ──────────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="max-w-xl mx-auto py-24 text-center space-y-5">
+      <div className="py-24 text-center space-y-5">
         <div className="w-20 h-20 bg-dev-mint/10 border border-dev-mint/30 rounded-full flex items-center justify-center mx-auto">
           <Send size={32} className="text-dev-mint" />
         </div>
@@ -181,7 +181,7 @@ function NewIssueForm() {
 
   // ── Form ────────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-3xl mx-auto py-4">
+    <div className="space-y-8">
 
       {/* Back nav */}
       <button

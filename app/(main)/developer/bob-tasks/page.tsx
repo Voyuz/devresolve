@@ -67,7 +67,7 @@ export default function BobResolutionPage() {
   const resolved = tasks.filter((t) => t.bobStatus === "Published");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {workspace.error && <p role="alert" className="text-red-600">{workspace.error}</p>}
       {workspace.loading && <p>Loading Bob jobs...</p>}
       {/* Header */}
@@ -75,10 +75,10 @@ export default function BobResolutionPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#6287a2] flex items-center gap-2">
             <Cpu className="text-[#5ec0ca] w-6 h-6" />
-            Bob AI Resolution Queue
+            Bob Resolution
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Tasks currently being handled by Bob AI — review and accept or reject generated fixes
+            Review and evaluate automated resolutions proposed by the AI Agent.
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -12,7 +12,6 @@ import {
   FolderOpen,
   User,
   Calendar,
-  Tag,
 } from "lucide-react";
 import { useWorkspace, issueStatus } from "@/components/layout/use-workspace";
 import { Badge } from "@/components/ui/badge";
@@ -193,7 +192,7 @@ function IssueDetail({ issue, onClose }: { issue: Issue; onClose: () => void }) 
               <Bot className="w-3.5 h-3.5 text-[#5ec0ca]" />
             </div>
             <span className="text-xs font-bold text-[#449199] uppercase tracking-widest">
-              IBM Bob AI — Resolution Summary
+              AI Agent — Resolution Summary
             </span>
           </div>
           <p className="text-sm text-slate-600 leading-relaxed bg-[#5ec0ca]/5 border border-[#5ec0ca]/15 rounded-lg px-4 py-3">
@@ -204,7 +203,7 @@ function IssueDetail({ issue, onClose }: { issue: Issue; onClose: () => void }) 
         <div className="px-5 py-4">
           <div className="flex items-center gap-2 text-slate-400 text-sm">
             <CircleDashed className="w-4 h-4" />
-            This issue has not been picked up by Bob AI yet.
+            This issue has not been assigned to the AI Agent yet.
           </div>
         </div>
       )}
@@ -233,21 +232,7 @@ export default function IssuesPage() {
     return matchStatus && matchSearch;
   });
 
-  // ── Summary counts ──
-  const counts = {
-    total:         MY_ISSUES.length,
-    resolved:      MY_ISSUES.filter((i) => i.status === "RESOLVED").length,
-    inProgress:    MY_ISSUES.filter((i) => i.status === "IN_PROGRESS").length,
-    pendingReview: MY_ISSUES.filter((i) => i.status === "PENDING_REVIEW").length,
-    open:          MY_ISSUES.filter((i) => i.status === "OPEN").length,
-  };
 
-  const summaryStats = [
-    { label: "Total Reported",   value: counts.total,         color: "text-[#6287a2]", border: "border-[#6287a2]/30", bg: "bg-[#6287a2]/5",  icon: Tag         },
-    { label: "Resolved",         value: counts.resolved,      color: "text-[#80c8bc]", border: "border-[#80c8bc]/30", bg: "bg-[#80c8bc]/5",  icon: CheckCircle2 },
-    { label: "In Progress",      value: counts.inProgress,    color: "text-[#5ec0ca]", border: "border-[#5ec0ca]/30", bg: "bg-[#5ec0ca]/5",  icon: Bot          },
-    { label: "Awaiting Review",  value: counts.pendingReview, color: "text-[#b87643]", border: "border-[#ce8f5a]/30", bg: "bg-[#ce8f5a]/5",  icon: Clock        },
-  ];
 
   return (
     <div className="space-y-8">
@@ -262,34 +247,12 @@ export default function IssuesPage() {
             My Issues
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Track reports saved in Supabase (shared team demo; sign-in is not configured)
+            Monitor and manage your reported issues and their current resolution status.
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className="border-[#5ec0ca]/40 text-[#449199] bg-[#5ec0ca]/5 text-xs font-semibold gap-1.5"
-        >
-          <User className="w-3.5 h-3.5" /> Rangga Pratama
-        </Badge>
       </div>
 
-      {/* ── Summary KPI Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryStats.map((s) => (
-          <div
-            key={s.label}
-            className={`border ${s.border} ${s.bg} rounded-xl p-5 flex items-center justify-between`}
-          >
-            <div>
-              <p className="text-slate-500 text-sm font-medium">{s.label}</p>
-              <p className={`text-3xl font-bold mt-1 ${s.color}`}>{s.value}</p>
-            </div>
-            <div className="p-3 bg-white/60 rounded-lg border border-white/80">
-              <s.icon className={`w-5 h-5 ${s.color}`} />
-            </div>
-          </div>
-        ))}
-      </div>
+
 
       {/* ── Issue List + Detail ── */}
       <div className={`grid gap-6 ${selected ? "grid-cols-1 lg:grid-cols-5" : "grid-cols-1"}`}>
@@ -370,7 +333,7 @@ export default function IssuesPage() {
       {/* ── Footer ── */}
       <div className="pt-4 border-t border-slate-100 flex items-center gap-2 text-[10px] text-slate-300 font-medium uppercase tracking-widest">
         <ClipboardList className="w-3 h-3 text-[#5ec0ca]" />
-        DevResolve · AI-Powered Issue Resolution Pipeline · IBM Bob 2.0 Hackathon
+        DevResolve · AI-Powered Issue Resolution Pipeline
       </div>
     </div>
   );

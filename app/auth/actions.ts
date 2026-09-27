@@ -20,7 +20,7 @@ export async function signIn(formData: FormData) {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, NamaUser, SandiUser")
+    .select("id, NamaUser, SandiUser, role")
     .eq("NamaUser", namaUser)
     .single();
 
@@ -37,8 +37,8 @@ export async function signIn(formData: FormData) {
     redirect("/auth/login?error=Incorrect+password");
   }
 
-  // Simpan session ke cookie
-  const session: SessionUser = { id: data.id, NamaUser: data.NamaUser! };
+  // Save session to cookie
+  const session: SessionUser = { id: data.id, NamaUser: data.NamaUser!, role: data.role };
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, JSON.stringify(session), {
     httpOnly: true,
@@ -48,7 +48,11 @@ export async function signIn(formData: FormData) {
     maxAge: 60 * 60 * 24 * 7, // 7 hari
   });
 
-  redirect("/dashboard");
+  if (data.role === "developer") {
+    redirect("/developer");
+  } else {
+    redirect("/dashboard");
+  }
 }
 
 export async function signOut() {

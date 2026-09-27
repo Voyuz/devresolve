@@ -186,8 +186,8 @@ export default function BobIssueForm({ basePath = "/issues/new", heading = "Repo
         <p className="text-sm text-muted-foreground">
           {issueId ? `Investigate saved issue #${issueId}.` : reviewOnly ? "Review the saved Bob result and publish the approved fix to GitHub." : "Submit a bug report and watch IBM Bob Shell investigate and fix it."}
         </p>
-        <Link href="/" className="text-sm underline underline-offset-4">
-          ← Back to home
+        <Link href="/dashboard" className="text-sm underline underline-offset-4">
+          ← Back to Dashboard
         </Link>
       </div>
 

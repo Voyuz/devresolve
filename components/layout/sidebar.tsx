@@ -16,7 +16,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
   const menuItems = isDevMode
     ? [
-        { name: "Dev Overview", icon: Terminal, href: "/developer" },
+        { name: "Dashboard", icon: Home, href: "/developer" },
         { name: "Issues", icon: Bug, href: "/developer/triage" },
         { name: "Bob Resolution", icon: Cpu, href: "/developer/bob-tasks" },
         { name: "Register User", icon: UserPlus, href: "/developer/users/new" },
@@ -30,7 +30,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "h-screen bg-white border-r border-zinc-100 flex flex-col fixed left-0 top-0 z-30 transition-all duration-300",
+        "h-screen bg-white flex flex-col fixed left-0 top-0 z-30 transition-all duration-300",
         isCollapsed ? "w-20" : "w-64"
       )}
       onMouseEnter={() => setIsCollapsed(false)}
@@ -47,7 +47,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       {!isCollapsed && (
         <div className="mb-4 px-8">
           <p className="text-sub-header uppercase tracking-[2px]">
-            {isDevMode ? "Developer Mode" : "Reporter Mode"}
+            {isDevMode ? "Developer Mode" : "User Mode"}
           </p>
         </div>
       )}
@@ -69,21 +69,6 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
         })}
       </nav>
 
-      <div className="p-4 mt-auto">
-        <div className={cn("p-4 bg-dev-slate/5 rounded-2xl border border-dev-slate/10 transition-all", isCollapsed ? "flex justify-center" : "block")}>
-          {isCollapsed ? (
-            <div className="w-2 h-2 rounded-full bg-dev-mint animate-pulse" />
-          ) : (
-            <>
-              <p className="text-badge text-dev-slate mb-1">IBM Bob Agent</p>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-dev-mint animate-pulse" />
-                <p className="text-code text-zinc-500 tracking-tighter uppercase font-bold">Local worker</p>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
     </aside>
   );
 }

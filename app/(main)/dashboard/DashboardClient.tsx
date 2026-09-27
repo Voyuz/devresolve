@@ -67,7 +67,7 @@ export default function DashboardClient() {
             Project Overview
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Read-only snapshot of project &amp; AI pipeline health
+            Monitor the overall health and status of active projects.
           </p>
         </div>
         <Badge
@@ -160,7 +160,7 @@ export default function DashboardClient() {
 
       <div className="pt-4 border-t border-slate-100 flex items-center gap-2 text-[10px] text-slate-300 font-medium uppercase tracking-widest">
         <Zap className="w-3 h-3 text-[#5ec0ca]" />
-        DevResolve · AI-Powered Issue Resolution Pipeline · IBM Bob 2.0 Hackathon
+        DevResolve · AI-Powered Issue Resolution Pipeline
       </div>
     </div>
   );

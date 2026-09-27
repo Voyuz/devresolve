@@ -26,7 +26,7 @@ export default function RegisterUserPage() {
     if (result.error) {
       setError(result.error);
     } else if (result.success) {
-      setSuccess(result.message || "Berhasil!");
+      setSuccess(result.message || "Success!");
       (e.target as HTMLFormElement).reset();
     }
     
@@ -34,15 +34,15 @@ export default function RegisterUserPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-12 h-12 rounded-2xl bg-dev-cyan/10 flex items-center justify-center">
-          <UserPlus className="w-6 h-6 text-dev-cyan" />
-        </div>
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-dev-slate">Register New User</h1>
-          <p className="text-sm text-zinc-500">
-            Add a new user account to the system. Only developers can perform this action.
+          <h1 className="text-2xl font-bold text-[#6287a2] flex items-center gap-2">
+            <UserPlus className="text-[#5ec0ca] w-6 h-6" />
+            Register User
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Create and configure new user accounts for system access.
           </p>
         </div>
       </div>
@@ -59,8 +59,7 @@ export default function RegisterUserPage() {
                 <Label htmlFor="namaUser" className="text-xs uppercase font-bold tracking-wider text-zinc-500">Username</Label>
                 <Input 
                   id="namaUser" 
-                  name="namaUser" 
-                  placeholder="Example: john_doe" 
+                  name="namaUser"
                   required 
                   className="h-11 focus-visible:ring-dev-cyan"
                 />
@@ -70,8 +69,7 @@ export default function RegisterUserPage() {
                 <Label htmlFor="sandiUser" className="text-xs uppercase font-bold tracking-wider text-zinc-500">Password</Label>
                 <PasswordInput 
                   id="sandiUser" 
-                  name="sandiUser" 
-                  placeholder="Minimum 6 characters" 
+                  name="sandiUser"
                   required 
                   className="h-11 focus-visible:ring-dev-cyan"
                 />

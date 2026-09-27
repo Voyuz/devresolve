@@ -1,8 +1,8 @@
 import { getSession } from "@/app/auth/actions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
-import { Navbar } from "@/components/layout/navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Home, Tag, CheckCircle2, Bot, Clock } from "lucide-react";
 import type { Issue } from "@/types/issues";
 import DashboardClient from "./DashboardClient";
 
@@ -19,6 +19,7 @@ async function getStats() {
     open: issues.filter((i: Issue) => i.Status === "open" || i.Status === "triaged").length,
     inProgress: issues.filter((i: Issue) => i.Status === "in_progress").length,
     resolved: issues.filter((i: Issue) => i.Status === "resolved").length,
+    pendingReview: issues.filter((i: Issue) => i.Status === "ready_for_review").length,
   };
 }
 
@@ -48,50 +49,55 @@ export default async function DashboardPage() {
   const [stats, recentIssues] = await Promise.all([getStats(), getRecentIssues()]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar userName={session.NamaUser} />
-
-      <main className="mx-auto max-w-6xl space-y-8 px-6 py-8">
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Overview semua issues di DevResolve</p>
+          <h1 className="text-2xl font-bold text-[#6287a2] flex items-center gap-2">
+            <Home className="text-[#5ec0ca] w-6 h-6" />
+            Dashboard
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">A comprehensive overview of system issues and resolution progress.</p>
         </div>
+      </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Card>
-            <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Total Issues</CardTitle></CardHeader>
-            <CardContent><p className="text-3xl font-bold">{stats.total}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Open</CardTitle></CardHeader>
-            <CardContent><p className="text-3xl font-bold text-blue-600">{stats.open}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">In Progress</CardTitle></CardHeader>
-            <CardContent><p className="text-3xl font-bold text-purple-600">{stats.inProgress}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Resolved</CardTitle></CardHeader>
-            <CardContent><p className="text-3xl font-bold text-green-600">{stats.resolved}</p></CardContent>
-          </Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: "Total Reported",   value: stats.total,         color: "text-[#6287a2]", border: "border-[#6287a2]/30", bg: "bg-[#6287a2]/5",  icon: Tag },
+            { label: "Resolved",         value: stats.resolved,      color: "text-[#80c8bc]", border: "border-[#80c8bc]/30", bg: "bg-[#80c8bc]/5",  icon: CheckCircle2 },
+            { label: "In Progress",      value: stats.inProgress,    color: "text-[#5ec0ca]", border: "border-[#5ec0ca]/30", bg: "bg-[#5ec0ca]/5",  icon: Bot },
+            { label: "Awaiting Review",  value: stats.pendingReview, color: "text-[#b87643]", border: "border-[#ce8f5a]/30", bg: "bg-[#ce8f5a]/5",  icon: Clock },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className={`border ${s.border} ${s.bg} rounded-xl p-5 flex items-center justify-between`}
+            >
+              <div>
+                <p className="text-slate-500 text-sm font-medium">{s.label}</p>
+                <p className={`text-3xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+              </div>
+              <div className="p-3 bg-white/60 rounded-lg border border-white/80">
+                <s.icon className={`w-5 h-5 ${s.color}`} />
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Recent Issues */}
         <Card>
           <CardHeader>
-            <CardTitle>Issues Terbaru</CardTitle>
+            <CardTitle>Recent Issues</CardTitle>
           </CardHeader>
           <CardContent>
             {recentIssues.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Belum ada issues. <a href="/issues/new" className="underline">Buat issue pertama</a>.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">No issues yet. <a href="/issues/new" className="underline">Create your first issue</a>.</p>
             ) : (
               <div className="divide-y">
                 {recentIssues.map((issue) => (
                   <div key={issue.id} className="flex items-center justify-between py-3">
                     <div className="space-y-0.5">
                       <a href={`/issues/${issue.id}`} className="text-sm font-medium hover:underline">
-                        {issue.title ?? "(Tanpa judul)"}
+                        {issue.title ?? "(Untitled)"}
                       </a>
                       <p className="text-xs text-muted-foreground">{issue.CategoryIssues ?? "Uncategorized"}</p>
                     </div>
@@ -107,7 +113,6 @@ export default async function DashboardPage() {
 
         {/* IBM Bob Hackathon Read-Only View */}
         <DashboardClient />
-      </main>
     </div>
   );
 }

@@ -14,6 +14,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // Jika gagal, redirect ke halaman login dengan pesan error
+  // If failed, redirect to the login page with an error message
   return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_failed`);
 }

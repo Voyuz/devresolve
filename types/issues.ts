@@ -4,6 +4,7 @@ export interface Profile {
   created_at: string;
   NamaUser: string | null;
   SandiUser: string | null;
+  role: "user" | "developer";
 }
 
 // ── Issue ───────────────────────────────────────────────────────────
@@ -54,4 +55,5 @@ export interface BobJob {
 export interface SessionUser {
   id: number;
   NamaUser: string;
+  role: "user" | "developer";
 }

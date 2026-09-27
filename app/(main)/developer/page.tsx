@@ -8,6 +8,7 @@ import {
   Clock,
   GitMerge,
   Activity,
+  Home,
   BarChart3,
   ShieldCheck,
 } from "lucide-react";
@@ -59,10 +60,10 @@ const stats = [
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#6287a2] flex items-center gap-2">
-            <Activity className="text-[#5ec0ca] w-6 h-6" />
-            Developer Overview
+            <Home className="text-[#5ec0ca] w-6 h-6" />
+            Dashboard
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Read-only snapshot of project & AI pipeline health</p>
+          <p className="text-sm text-slate-500 mt-1">Monitor the overall health and status of active projects.</p>
         </div>
         <Badge variant="outline" className="border-[#80c8bc]/50 text-[#2c7a6e] bg-[#80c8bc]/10 text-xs font-semibold gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5" /> Read-Only View
@@ -156,7 +157,7 @@ const stats = [
           <Cpu className="w-5 h-5 text-[#5ec0ca]" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-[#449199] mb-1">IBM Bob AI Agent — Pipeline Summary</h3>
+          <h3 className="text-sm font-bold text-[#449199] mb-1">AI Agent — Pipeline Summary</h3>
           <p className="text-sm text-slate-600 leading-relaxed">
             Bob has <strong>{workspace.jobs.filter(job => ["QUEUED", "CLONING", "INVESTIGATING", "FIXING", "VALIDATING"].includes(job.status)).length} active jobs</strong>.
             {" "}{workspace.jobs.filter(job => job.status === "READY_FOR_REVIEW" && job.review_status === "PENDING").length} fixes are awaiting developer review.

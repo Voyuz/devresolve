@@ -96,18 +96,18 @@ export default function IssueTriagePage() {
   const assigned = issues.filter((i) => i.assignedTo !== null);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {workspace.error && <p role="alert" className="text-red-600">{workspace.error}</p>}
       {workspace.loading && <p>Loading reports?</p>}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#6287a2] flex items-center gap-2">
-            <Inbox className="text-[#5ec0ca] w-6 h-6" />
-            Issue Inbox
+            <Bug className="text-[#5ec0ca] w-6 h-6" />
+            Issues
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Raw bug reports awaiting triage — assign to Bob AI or a human developer
+            Incoming bug reports requiring triage and assignment for resolution.
           </p>
         </div>
         <div className="flex items-center gap-3">
